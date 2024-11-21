@@ -16,6 +16,8 @@ jobs:
         uses: aevea/action-kaniko@master
         with:
           image: camelia-studio/kiss-shot_acerola-orion_heart-under-blade
+          username: camelia
+          password: camelia
           registry: ${{ secrets.REGISTRY_SERVER }}
           tag: ${{ gitea.ref_name }}
           tag_with_latest: true
