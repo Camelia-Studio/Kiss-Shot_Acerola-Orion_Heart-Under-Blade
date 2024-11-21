@@ -5,7 +5,8 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.*;
+import net.dv8tion.jda.api.entities.channel.unions.GuildChannelUnion;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
@@ -35,7 +36,7 @@ public class MsgSendCommand implements ISlashCommand {
     @Override
     public List<OptionData> getOptions() {
         return List.of(
-                new OptionData(OptionType.CHANNEL, "channel", "Le salon où envoyer le message", true).setChannelTypes(ChannelType.TEXT),
+                new OptionData(OptionType.CHANNEL, "channel", "Le salon où envoyer le message", true).setChannelTypes(ChannelType.NEWS, ChannelType.TEXT, ChannelType.GUILD_NEWS_THREAD, ChannelType.GUILD_PRIVATE_THREAD, ChannelType.GUILD_PUBLIC_THREAD, ChannelType.VOICE, ChannelType.STAGE),
                 new OptionData(OptionType.STRING, "message", "Le message à envoyer", false),
                 new OptionData(OptionType.ATTACHMENT, "attachment", "L'embed à envoyer", false)
 
@@ -60,8 +61,7 @@ public class MsgSendCommand implements ISlashCommand {
             return;
         }
 
-        TextChannel channel = Objects.requireNonNull(event.getOption("channel")).getAsChannel().asTextChannel();
-
+        GuildChannelUnion chan = Objects.requireNonNull(event.getOption("channel")).getAsChannel();
         OptionMapping message = event.getOption("message");
         OptionMapping attachment = event.getOption("attachment");
 
@@ -69,16 +69,49 @@ public class MsgSendCommand implements ISlashCommand {
             event.reply("Vous devez spécifier un message ou un embed à envoyer !").queue();
             return;
         }
+
         try {
             if (message != null) {
-                channel.sendMessage(message.getAsString()).queue();
+                if (chan.getType() == ChannelType.TEXT) {
+                    TextChannel channel = chan.asTextChannel();
+                    channel.sendMessage(message.getAsString()).queue();
+                } else if (chan.getType() == ChannelType.GUILD_NEWS_THREAD || chan.getType() == ChannelType.GUILD_PRIVATE_THREAD || chan.getType() == ChannelType.GUILD_PUBLIC_THREAD) {
+                    ThreadChannel channel = chan.asThreadChannel();
+                    channel.sendMessage(message.getAsString()).queue();
+                } else if (chan.getType() == ChannelType.NEWS) {
+                    NewsChannel channel = chan.asNewsChannel();
+
+                    channel.sendMessage(message.getAsString()).queue();
+                }else if (chan.getType() == ChannelType.VOICE) {
+                    VoiceChannel channel = chan.asVoiceChannel();
+                    channel.sendMessage(message.getAsString()).queue();
+                }else if (chan.getType() == ChannelType.STAGE) {
+                    StageChannel channel = chan.asStageChannel();
+                    channel.sendMessage(message.getAsString()).queue();
+                }
             }
 
             if (attachment != null) {
                 Message.Attachment file = attachment.getAsAttachment();
                 String content = URLFileReader.readFileFromURL(file.getUrl());
 
-                channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
+
+                if (chan.getType() == ChannelType.TEXT) {
+                    TextChannel channel = chan.asTextChannel();
+                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
+                } else if (chan.getType() == ChannelType.GUILD_NEWS_THREAD || chan.getType() == ChannelType.GUILD_PRIVATE_THREAD || chan.getType() == ChannelType.GUILD_PUBLIC_THREAD) {
+                    ThreadChannel channel = chan.asThreadChannel();
+                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
+                } else if (chan.getType() == ChannelType.NEWS) {
+                    NewsChannel channel = chan.asNewsChannel();
+                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
+                }else if (chan.getType() == ChannelType.VOICE) {
+                    VoiceChannel channel = chan.asVoiceChannel();
+                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
+                }else if (chan.getType() == ChannelType.STAGE) {
+                    StageChannel channel = chan.asStageChannel();
+                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
+                }
             }
 
             event.reply("Message envoyé !").queue();
