@@ -3,7 +3,7 @@ WORKDIR /src
 COPY . .
 
 RUN ./gradlew clean shadowJar
-FROM eclipse-temurin:21-jre-alpine AS runner
+FROM eclipse-temurin:21-alpine AS runner
 RUN mkdir -p /app
 WORKDIR /app
 COPY --from=build /src/build/libs/kiss-shot-acerola.jar /app/kiss-shot-acerola.jar
