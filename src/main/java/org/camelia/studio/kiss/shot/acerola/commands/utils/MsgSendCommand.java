@@ -116,7 +116,7 @@ public class MsgSendCommand implements ISlashCommand {
 
             event.reply("Message envoyé !").queue();
         } catch (Exception e) {
-            event.reply("Message envoyé !").queue();
+            event.reply("Erreur lors de l'envoi du message !\n%s".formatted(e.getMessage())).queue();
             logger.error("Erreur lors de l'envoi du message", e);
         }
     }
