@@ -3,7 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.listeners;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.managers.AudioManager;
@@ -19,7 +19,7 @@ public class VoiceLeaveListener extends ListenerAdapter {
             return;
         }
 
-        VoiceChannel botChannel = audioManager.getConnectedChannel().asVoiceChannel();
+        AudioChannel botChannel = audioManager.getConnectedChannel();
         
         // Compte le nombre de membres dans le canal (excluant les bots)
         long realMembersCount = botChannel.getMembers().stream()
