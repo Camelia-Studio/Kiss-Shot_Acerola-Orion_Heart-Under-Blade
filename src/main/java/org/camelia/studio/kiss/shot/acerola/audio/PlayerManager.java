@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class PlayerManager {
@@ -41,7 +42,7 @@ public class PlayerManager {
 
     public void loadAndPlay(GuildMessageChannel channel, String url) {
         final GuildMusicManager musicManager = getMusicManager(channel.getGuild());
-        
+
         audioPlayerManager.loadItemOrdered(musicManager, url, new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack track) {
@@ -51,9 +52,14 @@ public class PlayerManager {
 
             @Override
             public void playlistLoaded(AudioPlaylist playlist) {
-                final AudioTrack track = playlist.getTracks().get(0);
-                musicManager.scheduler.queue(track);
-                channel.sendMessage("Ajout à la file d'attente: `" + track.getInfo().title + "`").queue();
+                List<AudioTrack> tracks = playlist.getTracks();
+
+                channel.sendMessage(
+                        "Ajout à la file d'attente: `" + playlist.getName() + "` - " + tracks.size() + " musiques.")
+                        .queue();
+
+                for (AudioTrack track : tracks)
+                    musicManager.scheduler.queue(track);
             }
 
             @Override
