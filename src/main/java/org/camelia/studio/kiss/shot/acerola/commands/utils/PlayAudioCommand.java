@@ -1,10 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.commands.utils;
 
-import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
-import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
@@ -45,12 +42,11 @@ public class PlayAudioCommand implements ISlashCommand {
             return;
         }
 
-        VoiceChannel channel = voiceState.getChannel().asVoiceChannel();
-
         AudioManager audioManager = event.getGuild().getAudioManager();
-        audioManager.openAudioConnection(channel);
+
+        audioManager.openAudioConnection(voiceState.getChannel());
         PlayerManager.getInstance().getMusicManager(event.getGuild()).audioPlayer.setVolume(25);
-        PlayerManager.getInstance().loadAndPlay(event.getChannel().asTextChannel(), url);
+        PlayerManager.getInstance().loadAndPlay(event.getChannel().asGuildMessageChannel(), url);
         event.getHook().editOriginal("Chargement du fichier audio en cours...").queue();
     }
 }
