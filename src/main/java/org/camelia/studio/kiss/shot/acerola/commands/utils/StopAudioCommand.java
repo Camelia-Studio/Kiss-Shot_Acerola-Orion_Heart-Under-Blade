@@ -8,11 +8,11 @@ import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.managers.AudioManager;
 
-public class StopCommand implements ISlashCommand{
+public class StopAudioCommand implements ISlashCommand{
 
     @Override
     public String getName() {
-        return "stopaudio"
+        return "stopaudio";
     }
 
     @Override
