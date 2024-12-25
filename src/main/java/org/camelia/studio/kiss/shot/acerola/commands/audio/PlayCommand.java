@@ -1,4 +1,4 @@
-package org.camelia.studio.kiss.shot.acerola.commands.utils;
+package org.camelia.studio.kiss.shot.acerola.commands.audio;
 
 import net.dv8tion.jda.api.audio.hooks.ConnectionListener;
 import net.dv8tion.jda.api.audio.hooks.ConnectionStatus;
@@ -15,10 +15,10 @@ import java.util.List;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 
-public class PlayAudioCommand implements ISlashCommand {
+public class PlayCommand implements ISlashCommand {
     @Override
     public String getName() {
-        return "playaudio";
+        return "play";
     }
 
     @Override

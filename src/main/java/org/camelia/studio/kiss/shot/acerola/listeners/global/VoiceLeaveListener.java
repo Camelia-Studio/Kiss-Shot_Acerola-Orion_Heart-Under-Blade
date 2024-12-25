@@ -1,4 +1,4 @@
-package org.camelia.studio.kiss.shot.acerola.listeners;
+package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 

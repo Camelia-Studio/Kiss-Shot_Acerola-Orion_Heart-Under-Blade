@@ -1,4 +1,4 @@
-package org.camelia.studio.kiss.shot.acerola.listeners;
+package org.camelia.studio.kiss.shot.acerola.listeners.bot;
 
 import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
 import net.dv8tion.jda.api.JDA;

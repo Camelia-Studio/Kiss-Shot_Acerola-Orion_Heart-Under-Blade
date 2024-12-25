@@ -1,4 +1,4 @@
-package org.camelia.studio.kiss.shot.acerola.listeners;
+package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;

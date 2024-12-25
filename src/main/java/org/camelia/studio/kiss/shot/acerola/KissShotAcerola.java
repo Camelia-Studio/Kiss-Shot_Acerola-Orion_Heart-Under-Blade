@@ -1,6 +1,6 @@
 package org.camelia.studio.kiss.shot.acerola;
 
-import org.camelia.studio.kiss.shot.acerola.listeners.ReadyListener;
+import org.camelia.studio.kiss.shot.acerola.listeners.bot.ReadyListener;
 import org.camelia.studio.kiss.shot.acerola.managers.ListenerManager;
 import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
 import net.dv8tion.jda.api.JDA;

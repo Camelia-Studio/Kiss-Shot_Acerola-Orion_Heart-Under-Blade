@@ -1,4 +1,4 @@
-package org.camelia.studio.kiss.shot.acerola.commands.utils;
+package org.camelia.studio.kiss.shot.acerola.commands.audio;
 
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
@@ -8,11 +8,11 @@ import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.managers.AudioManager;
 
-public class StopAudioCommand implements ISlashCommand{
+public class StopCommand implements ISlashCommand {
 
     @Override
     public String getName() {
-        return "stopaudio";
+        return "stop";
     }
 
     @Override
@@ -35,7 +35,7 @@ public class StopAudioCommand implements ISlashCommand{
             event.reply("Je ne suis pas connecté à un canal vocal !").queue();
             return;
         }
-        
+
         if (voiceState.getChannel() != audioManager.getConnectedChannel()) {
             event.reply("Vous devez être dans le même canal vocal que moi !").queue();
             return;
@@ -44,10 +44,10 @@ public class StopAudioCommand implements ISlashCommand{
         // Arrêter la musique
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
         musicManager.audioPlayer.stopTrack();
-        
+
         // Déconnecter le bot
         audioManager.closeAudioConnection();
-        
+
         event.reply("Musique arrêtée et déconnexion du canal vocal.").queue();
     }
 
