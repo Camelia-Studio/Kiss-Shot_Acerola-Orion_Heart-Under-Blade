@@ -6,41 +6,32 @@ import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
-import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.managers.AudioManager;
 
-import java.util.List;
-
-public class VolumeCommand implements ISlashCommand {
+public class ShuffleCommand implements ISlashCommand {
 
     @Override
     public String getName() {
-        return "volume";
+        return "shuffle";
     }
 
     @Override
     public String getDescription() {
-        return "Permet de changer le volume du bot";
-    }
-
-    @Override
-    public List<OptionData> getOptions() {
-        return List.of(
-            new OptionData(OptionType.INTEGER, "volume", "Le volume souhaité").setRequired(true).setMinValue(0).setMaxValue(100)
-        );
+        return "Permet de mélanger la file d'attente";
     }
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
         event.deferReply().queue();
 
+        // Vérifier si l'utilisateur est dans un canal vocal
         GuildVoiceState voiceState = event.getMember().getVoiceState();
         if (!voiceState.inAudioChannel()) {
-            event.reply("Vous devez être dans un canal vocal pour utiliser cette commande !").queue();
+            event.getHook().editOriginal("Vous devez être dans un canal vocal pour utiliser cette commande !").queue();
             return;
         }
 
+        // Vérifier si le bot est dans le même canal vocal
         AudioManager audioManager = event.getGuild().getAudioManager();
         if (!audioManager.isConnected()) {
             event.getHook().editOriginal("Je ne suis pas connecté à un canal vocal !").queue();
@@ -52,12 +43,11 @@ public class VolumeCommand implements ISlashCommand {
             return;
         }
 
+        // On passe aux musiques suivantes
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
+        musicManager.scheduler.shuffle();
 
-        int volume = Integer.parseInt(event.getOption("volume").getAsString());
-
-        musicManager.audioPlayer.setVolume(volume);
-
-        event.getHook().editOriginal("Le volume a été changé à " + volume + "%").queue();
+        event.getHook().editOriginal("La file d'attente a été mélangée !").queue();
     }
+
 }

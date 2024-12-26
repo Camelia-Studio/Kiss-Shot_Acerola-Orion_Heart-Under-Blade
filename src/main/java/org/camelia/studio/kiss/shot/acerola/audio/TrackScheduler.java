@@ -11,6 +11,8 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
 public class TrackScheduler extends AudioEventAdapter {
     private final AudioPlayer player;
     private final Queue<AudioTrack> queue;
+    private boolean loop = false;
+    private boolean repeat = false;
 
     public TrackScheduler(AudioPlayer player) {
         this.player = player;
@@ -31,13 +33,27 @@ public class TrackScheduler extends AudioEventAdapter {
     }
 
     public void nextTrack() {
-        player.startTrack(queue.poll(), false);
+        AudioTrack track = queue.poll();
+
+        if (loop) {
+            queue.offer(track.makeClone());
+        } else if (repeat) {
+            // ON ajoute la track au début de la queue
+            LinkedList<AudioTrack> list = new LinkedList<>(queue);
+            queue.clear();
+            queue.offer(track.makeClone());
+            while (!list.isEmpty()) {
+                queue.offer(list.poll());
+            }
+        }
+        player.startTrack(track, false);
     }
 
     public void nextTrack(int nextTrack) {
         if (nextTrack < 1) {
             return;
         }
+
         for (int i = 0; i < nextTrack - 1; i++) {
             queue.poll();
         }
@@ -47,8 +63,25 @@ public class TrackScheduler extends AudioEventAdapter {
     public Queue<AudioTrack> getQueue() {
         return queue;
     }
- 
+
     public void clearQueue() {
         queue.clear();
+    }
+
+    public void shuffle() {
+        LinkedList<AudioTrack> list = new LinkedList<>(queue);
+        queue.clear();
+        while (!list.isEmpty()) {
+            int index = (int) (Math.random() * list.size());
+            queue.offer(list.remove(index));
+        }
+    }
+
+    public void setLoop(boolean loop) {
+        this.loop = loop;
+    }
+
+    public void setRepeat(boolean repeat) {
+        this.repeat = repeat;
     }
 }

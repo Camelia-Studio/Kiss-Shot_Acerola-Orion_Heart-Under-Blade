@@ -38,6 +38,12 @@ public class PauseCommand implements ISlashCommand {
             return;
         }
 
+        if (member.getVoiceState().getChannel() != audioManager.getConnectedChannel()) {
+            event.getHook().editOriginal("Vous devez être dans le même salon vocal que moi pour utiliser cette commande !")
+                .queue();
+            return;
+        }
+
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
 
         boolean isPaused = musicManager.audioPlayer.isPaused();

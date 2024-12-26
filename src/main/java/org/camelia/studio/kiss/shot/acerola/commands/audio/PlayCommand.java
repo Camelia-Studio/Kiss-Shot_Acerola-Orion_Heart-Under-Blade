@@ -47,6 +47,15 @@ public class PlayCommand implements ISlashCommand {
 
         AudioManager audioManager = event.getGuild().getAudioManager();
 
+        if (!audioManager.isConnected()) {
+            audioManager.openAudioConnection(voiceState.getChannel());
+            PlayerManager.getInstance().getMusicManager(event.getGuild()).audioPlayer.setVolume(25);
+        } else if (member.getVoiceState().getChannel() != audioManager.getConnectedChannel()) {
+            event.getHook().editOriginal("Vous devez être dans le même salon vocal que moi pour utiliser cette commande !")
+                    .queue();
+            return;
+        }
+
         audioManager.setConnectionListener(new ConnectionListener() {
             @Override
             public void onStatusChange(ConnectionStatus status) {
@@ -63,11 +72,6 @@ public class PlayCommand implements ISlashCommand {
                 }
             }
         });
-
-        if (!audioManager.isConnected()) {
-            audioManager.openAudioConnection(voiceState.getChannel());
-            PlayerManager.getInstance().getMusicManager(event.getGuild()).audioPlayer.setVolume(25);
-        }
 
         PlayerManager.getInstance().loadAndPlay(event.getChannel().asGuildMessageChannel(), url);
         event.getHook().editOriginal("Chargement du fichier audio en cours...").queue();
