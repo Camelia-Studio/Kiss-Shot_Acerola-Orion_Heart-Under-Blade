@@ -39,7 +39,7 @@ public class PlayCommand implements ISlashCommand {
         Member member = event.getMember();
         GuildVoiceState voiceState = member.getVoiceState();
 
-        if (!member.getVoiceState().inAudioChannel()) {
+        if (!voiceState.inAudioChannel()) {
             event.getHook().editOriginal("Vous devez être connecté à un salon vocal pour utiliser cette commande !")
                     .queue();
             return;
@@ -64,8 +64,11 @@ public class PlayCommand implements ISlashCommand {
             }
         });
 
-        audioManager.openAudioConnection(voiceState.getChannel());
-        PlayerManager.getInstance().getMusicManager(event.getGuild()).audioPlayer.setVolume(25);
+        if (!audioManager.isConnected()) {
+            audioManager.openAudioConnection(voiceState.getChannel());
+            PlayerManager.getInstance().getMusicManager(event.getGuild()).audioPlayer.setVolume(25);
+        }
+
         PlayerManager.getInstance().loadAndPlay(event.getChannel().asGuildMessageChannel(), url);
         event.getHook().editOriginal("Chargement du fichier audio en cours...").queue();
     }

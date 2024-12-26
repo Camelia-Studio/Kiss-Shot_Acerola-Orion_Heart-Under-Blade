@@ -29,7 +29,7 @@ public class QueueCommand implements ISlashCommand {
 
     @Override
     public String getDescription() {
-        return "Permet de passer à la musique suivante";
+        return "Permet de voir la file d'attente";
     }
 
     @Override
@@ -62,7 +62,6 @@ public class QueueCommand implements ISlashCommand {
         // On passe aux musiques suivantes
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
         Queue<AudioTrack> queue = musicManager.scheduler.getQueue();
-        AudioTrack currentTrack = musicManager.audioPlayer.getPlayingTrack();
 
         if (queue.isEmpty()) {
             event.getHook().editOriginal("La file d'attente est vide.").queue();
