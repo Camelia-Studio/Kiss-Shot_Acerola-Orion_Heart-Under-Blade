@@ -17,10 +17,14 @@ repositories {
 }
 
 dependencies {
+    implementation("org.hibernate:hibernate-core:6.6.2.Final")
+    implementation("org.hibernate:hibernate-hikaricp:6.6.2.Final")
+    implementation("org.postgresql:postgresql:42.7.4")
     implementation("io.github.cdimascio:dotenv-kotlin:6.4.2")
     implementation("net.dv8tion:JDA:5.2.1")
     implementation("ch.qos.logback:logback-classic:1.5.12")
     implementation ("dev.arbjerg:lavaplayer:2.2.2")
+    implementation("jakarta.annotation:jakarta.annotation-api:3.0.0")
 }
 
 
