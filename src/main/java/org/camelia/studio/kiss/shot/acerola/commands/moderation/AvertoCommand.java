@@ -45,7 +45,7 @@ public class AvertoCommand implements ISlashCommand {
 
     @Override
     public DefaultMemberPermissions defaultPermissions() {
-        return DefaultMemberPermissions.enabledFor(Permission.MESSAGE_MANAGE);
+        return DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS);
     }
 
     @Override
