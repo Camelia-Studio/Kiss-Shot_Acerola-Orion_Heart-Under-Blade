@@ -8,3 +8,8 @@ build
 .env
 .env.*
 !.env.example
+
+.classpath
+.project
+.settings/
+/bin
