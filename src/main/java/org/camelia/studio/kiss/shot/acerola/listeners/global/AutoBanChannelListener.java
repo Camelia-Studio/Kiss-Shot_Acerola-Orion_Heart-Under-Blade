@@ -18,20 +18,27 @@ public class AutoBanChannelListener extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(AutoBanChannelListener.class);
 
     private final Set<String> watchedChannelIds;
+    private final Set<String> protectedRoleIds;
 
     public AutoBanChannelListener() {
-        String raw = Configuration.getInstance().getDotenv().get("AUTO_BAN_CHANNEL_IDS", "");
-        if (raw == null || raw.isBlank()) {
-            watchedChannelIds = Set.of();
-        } else {
-            watchedChannelIds = Arrays.stream(raw.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .collect(Collectors.toUnmodifiableSet());
-        }
+        String rawChannels = Configuration.getInstance().getDotenv().get("AUTO_BAN_CHANNEL_IDS", "");
+        watchedChannelIds = parseIds(rawChannels);
+
+        String rawRoles = Configuration.getInstance().getDotenv().get("AUTO_BAN_EXEMPT_ROLE_IDS", "");
+        protectedRoleIds = parseIds(rawRoles);
+
         if (!watchedChannelIds.isEmpty()) {
-            logger.info("AutoBanChannel actif sur {} salon(s)", watchedChannelIds.size());
+            logger.info("AutoBanChannel actif sur {} salon(s), {} rôle(s) protégé(s)",
+                    watchedChannelIds.size(), protectedRoleIds.size());
         }
+    }
+
+    private static Set<String> parseIds(String raw) {
+        if (raw == null || raw.isBlank()) return Set.of();
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Override
@@ -43,6 +50,7 @@ public class AutoBanChannelListener extends ListenerAdapter {
         Member member = event.getMember();
         if (member == null) return;
         if (member.getUser().isBot()) return;
+        if (member.getRoles().stream().anyMatch(role -> protectedRoleIds.contains(role.getId()))) return;
 
         event.getMessage().delete().queue(null, err -> {});
 
