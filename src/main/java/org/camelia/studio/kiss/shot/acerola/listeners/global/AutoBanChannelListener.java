@@ -52,9 +52,7 @@ public class AutoBanChannelListener extends ListenerAdapter {
         if (member.getUser().isBot()) return;
         if (member.getRoles().stream().anyMatch(role -> protectedRoleIds.contains(role.getId()))) return;
 
-        event.getMessage().delete().queue(null, err -> {});
-
-        event.getGuild().ban(member, 0, TimeUnit.SECONDS)
+        event.getGuild().ban(member, 7, TimeUnit.DAYS)
                 .reason("Publication dans un salon restreint")
                 .queue(
                         success -> logger.info("Membre banni automatiquement suite à une publication dans un salon surveillé"),
