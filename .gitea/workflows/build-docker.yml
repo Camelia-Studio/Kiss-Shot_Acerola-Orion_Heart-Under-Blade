@@ -6,7 +6,8 @@ on:
       - '*'
 
 env:
-  IMAGE: ${{ secrets.REGISTRY_SERVER }}/camelia-studio/kiss-shot_acerola-orion_heart-under-blade
+  REGISTRY: ${{ secrets.REGISTRY_SERVER }}
+  IMAGE: camelia-studio/kiss-shot_acerola-orion_heart-under-blade
 
 jobs:
   build:
@@ -15,20 +16,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Login to registry
-        run: buildah login --username camelia --password camelia ${{ secrets.REGISTRY_SERVER }}
-
       - name: Build image
-        run: |
-          buildah bud \
-            --layers \
-            --cache-from ${{ env.IMAGE }}:cache \
-            --cache-to ${{ env.IMAGE }}:cache \
-            -t ${{ env.IMAGE }}:${{ gitea.ref_name }} \
-            -t ${{ env.IMAGE }}:latest \
-            .
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE }}
+          tags: ${{ gitea.ref_name }} latest
+          containerfiles: ./Dockerfile
 
       - name: Push image
-        run: |
-          buildah push ${{ env.IMAGE }}:${{ gitea.ref_name }}
-          buildah push ${{ env.IMAGE }}:latest
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ${{ env.REGISTRY }}
+          username: camelia
+          password: camelia
