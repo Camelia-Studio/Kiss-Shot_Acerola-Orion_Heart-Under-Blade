@@ -26,6 +26,9 @@ jobs:
           image: ${{ env.IMAGE }}
           tags: ${{ gitea.ref_name }} latest
           containerfiles: ./Dockerfile
+        env:
+          BUILDAH_ISOLATION: chroot
+          STORAGE_DRIVER: vfs
 
       - name: Push image
         uses: redhat-actions/push-to-registry@v2
