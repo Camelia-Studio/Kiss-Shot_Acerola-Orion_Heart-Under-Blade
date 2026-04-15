@@ -25,6 +25,8 @@ import net.dv8tion.jda.api.utils.FileUpload;
 
 public class AvertoCommand implements ISlashCommand {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AvertoCommand.class);
+
     @Override
     public String getName() {
         return "averto";
@@ -97,8 +99,8 @@ public class AvertoCommand implements ISlashCommand {
                 privateChannel
                         .sendMessage("Bonjour, Vous avez été averti sur %s pour la raison suivante : %s".formatted(
                                 event.getGuild().getName(), reason != null ? reason : "Aucune raison spécifiée"))
-                        .queue(null, err -> {});
-            }, err -> {});
+                        .queue(null, err -> logger.warn("Impossible d'envoyer le MP d'averto : {}", err.getMessage()));
+            }, err -> logger.warn("Impossible d'ouvrir le canal privé pour l'averto : {}", err.getMessage()));
 
             event.getHook().editOriginal("L'utilisateur %s a bien été averti !".formatted(member.getAsMention()))
                     .queue();
