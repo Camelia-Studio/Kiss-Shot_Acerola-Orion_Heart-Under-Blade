@@ -6,8 +6,7 @@ on:
       - '*'
 
 env:
-  REGISTRY: ${{ secrets.REGISTRY_SERVER }}
-  IMAGE: camelia-studio/kiss-shot_acerola-orion_heart-under-blade
+  IMAGE: ${{ secrets.REGISTRY_SERVER }}/camelia-studio/kiss-shot_acerola-orion_heart-under-blade
 
 jobs:
   build:
@@ -16,31 +15,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install buildah
-        run: |
-          sudo apt-get update && sudo apt-get install -y buildah
-          sudo mkdir -p /etc/containers
-          cat <<'EOF' | sudo tee /etc/containers/storage.conf
-          [storage]
-          driver = "vfs"
-          graphRoot = "/var/lib/containers/storage"
-          runRoot = "/run/containers/storage"
-          EOF
-
-      - name: Build image
-        id: build-image
-        uses: redhat-actions/buildah-build@v2
+      - name: Login to registry
+        uses: docker/login-action@v3
         with:
-          image: ${{ env.IMAGE }}
-          tags: ${{ gitea.ref_name }} latest
-          containerfiles: ./Dockerfile
-          extra-args: --isolation=chroot
-
-      - name: Push image
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ steps.build-image.outputs.tags }}
-          registry: ${{ env.REGISTRY }}
+          registry: ${{ secrets.REGISTRY_SERVER }}
           username: camelia
           password: camelia
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ gitea.ref_name }}
+            ${{ env.IMAGE }}:latest
