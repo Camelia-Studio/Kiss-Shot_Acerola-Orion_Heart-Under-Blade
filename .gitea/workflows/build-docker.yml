@@ -20,9 +20,12 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y buildah
           sudo mkdir -p /etc/containers
-          printf '[storage]\ndriver = "vfs"\n' | sudo tee /etc/containers/storage.conf
-          mkdir -p ~/.config/containers
-          printf '[engine]\nisolation = "chroot"\n' > ~/.config/containers/containers.conf
+          cat <<'EOF' | sudo tee /etc/containers/storage.conf
+          [storage]
+          driver = "vfs"
+          graphRoot = "/var/lib/containers/storage"
+          runRoot = "/run/containers/storage"
+          EOF
 
       - name: Build image
         id: build-image
