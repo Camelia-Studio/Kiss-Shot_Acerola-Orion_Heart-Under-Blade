@@ -17,7 +17,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install buildah
-        run: sudo apt-get update && sudo apt-get install -y buildah
+        run: |
+          sudo apt-get update && sudo apt-get install -y buildah
+          sudo mkdir -p /etc/containers
+          printf '[storage]\ndriver = "vfs"\n' | sudo tee /etc/containers/storage.conf
+          mkdir -p ~/.config/containers
+          printf '[engine]\nisolation = "chroot"\n' > ~/.config/containers/containers.conf
 
       - name: Build image
         id: build-image
@@ -26,9 +31,7 @@ jobs:
           image: ${{ env.IMAGE }}
           tags: ${{ gitea.ref_name }} latest
           containerfiles: ./Dockerfile
-        env:
-          BUILDAH_ISOLATION: chroot
-          STORAGE_DRIVER: vfs
+          extra-args: --isolation=chroot
 
       - name: Push image
         uses: redhat-actions/push-to-registry@v2
