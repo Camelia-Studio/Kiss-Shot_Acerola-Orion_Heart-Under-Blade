@@ -22,10 +22,12 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.utils.FileUpload;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AvertoCommand implements ISlashCommand {
 
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AvertoCommand.class);
+    private static final Logger logger = LoggerFactory.getLogger(AvertoCommand.class);
 
     @Override
     public String getName() {
