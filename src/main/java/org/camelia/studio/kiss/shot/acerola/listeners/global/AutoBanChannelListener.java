@@ -50,6 +50,8 @@ public class AutoBanChannelListener extends ListenerAdapter {
         Member member = event.getMember();
         if (member == null) return;
         if (member.getUser().isBot()) return;
+        if (member.isOwner()) return;
+        if (!event.getGuild().getSelfMember().canInteract(member)) return;
         if (member.getRoles().stream().anyMatch(role -> protectedRoleIds.contains(role.getId()))) return;
 
         event.getGuild().ban(member, 7, TimeUnit.DAYS)
