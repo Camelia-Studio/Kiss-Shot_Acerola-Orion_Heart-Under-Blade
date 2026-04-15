@@ -4,8 +4,6 @@ import org.camelia.studio.kiss.shot.acerola.db.HibernateConfig;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.query.Order;
-import org.hibernate.query.SortDirection;
 
 import java.util.List;
 
@@ -27,16 +25,14 @@ public class AvertoRepository {
 
     public List<Averto> findAll() {
         try (Session session = sessionFactory.openSession()) {
-            return session.createQuery("FROM User", Averto.class)
-                    .setOrder(Order.by(Averto.class, "createdAt", SortDirection.DESCENDING))
+            return session.createQuery("FROM Averto ORDER BY createdAt DESC", Averto.class)
                     .list();
         }
     }
 
     public List<Averto> findCount(int count) {
         try (Session session = sessionFactory.openSession()) {
-            return session.createQuery("FROM Averto", Averto.class)
-                    .setOrder(Order.by(Averto.class, "createdAt", SortDirection.DESCENDING))
+            return session.createQuery("FROM Averto ORDER BY createdAt DESC", Averto.class)
                     .setMaxResults(count)
                     .list();
         }
