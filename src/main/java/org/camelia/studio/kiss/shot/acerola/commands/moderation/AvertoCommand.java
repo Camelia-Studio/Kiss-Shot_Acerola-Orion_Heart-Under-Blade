@@ -97,8 +97,8 @@ public class AvertoCommand implements ISlashCommand {
                 privateChannel
                         .sendMessage("Bonjour, Vous avez été averti sur %s pour la raison suivante : %s".formatted(
                                 event.getGuild().getName(), reason != null ? reason : "Aucune raison spécifiée"))
-                        .queue();
-            });
+                        .queue(null, err -> {});
+            }, err -> {});
 
             event.getHook().editOriginal("L'utilisateur %s a bien été averti !".formatted(member.getAsMention()))
                     .queue();
