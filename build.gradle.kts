@@ -2,6 +2,7 @@ plugins {
     application
     id("java")
     id("com.gradleup.shadow") version "9.4.1"
+    id("org.owasp.dependencycheck") version "12.1.0"
 }
 
 group = "fr.melaine.gerard.kiss.shot.acerola"
