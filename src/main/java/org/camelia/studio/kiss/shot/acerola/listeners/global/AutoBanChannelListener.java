@@ -1,6 +1,8 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
@@ -8,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.Color;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -54,11 +57,41 @@ public class AutoBanChannelListener extends ListenerAdapter {
         if (!event.getGuild().getSelfMember().canInteract(member)) return;
         if (member.getRoles().stream().anyMatch(role -> protectedRoleIds.contains(role.getId()))) return;
 
+        String channelMention = event.getChannel().getAsMention();
+        String memberMention = member.getAsMention();
+
         event.getGuild().ban(member, 7, TimeUnit.DAYS)
                 .reason("Publication dans un salon restreint")
                 .queue(
-                        success -> logger.info("Membre banni automatiquement suite à une publication dans un salon surveillé"),
-                        error -> logger.error("Échec du ban automatique : {}", error.getMessage())
+                        success -> {
+                            logger.info("Membre banni automatiquement suite à une publication dans un salon surveillé");
+                            sendLogEmbed(event.getGuild().getTextChannelById(
+                                    Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID", "")),
+                                    memberMention, channelMention, null);
+                        },
+                        error -> {
+                            logger.error("Échec du ban automatique : {}", error.getMessage());
+                            sendLogEmbed(event.getGuild().getTextChannelById(
+                                    Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID", "")),
+                                    memberMention, channelMention, error.getMessage());
+                        }
                 );
+    }
+
+    private void sendLogEmbed(TextChannel logChannel, String memberMention, String channelMention, String errorReason) {
+        if (logChannel == null) return;
+
+        boolean success = errorReason == null;
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle(success ? "Ban automatique — Succès" : "Ban automatique — Échec")
+                .setColor(success ? Color.RED : Color.ORANGE)
+                .addField("Utilisateur", memberMention, true)
+                .addField("Salon", channelMention, true);
+
+        if (!success) {
+            embed.addField("Raison de l'échec", errorReason, false);
+        }
+
+        logChannel.sendMessageEmbeds(embed.build()).queue();
     }
 }
