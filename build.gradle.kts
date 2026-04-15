@@ -2,9 +2,10 @@ plugins {
     application
     id("java")
     id("com.gradleup.shadow") version "9.4.1"
+    id("org.owasp.dependencycheck") version "12.2.1"
 }
 
-group = "fr.melaine.gerard.kiss.shot.acerola"
+group = "org.camelia.studio.kiss.shot.acerola"
 version = "1.0-SNAPSHOT"
 application {
     mainClass = "org.camelia.studio.kiss.shot.acerola.KissShotAcerola"
