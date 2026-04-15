@@ -58,7 +58,7 @@ public class AutoBanChannelListener extends ListenerAdapter {
         if (member.getRoles().stream().anyMatch(role -> protectedRoleIds.contains(role.getId()))) return;
 
         String channelMention = event.getChannel().getAsMention();
-        String memberMention = member.getAsMention();
+        String memberTag = member.getUser().getName() + " (" + member.getId() + ")";
 
         event.getGuild().ban(member, 7, TimeUnit.DAYS)
                 .reason("Publication dans un salon restreint")
@@ -67,25 +67,28 @@ public class AutoBanChannelListener extends ListenerAdapter {
                             logger.info("Membre banni automatiquement suite à une publication dans un salon surveillé");
                             sendLogEmbed(event.getGuild().getTextChannelById(
                                     Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID", "")),
-                                    memberMention, channelMention, null);
+                                    memberTag, channelMention, null);
                         },
                         error -> {
                             logger.error("Échec du ban automatique : {}", error.getMessage());
                             sendLogEmbed(event.getGuild().getTextChannelById(
                                     Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID", "")),
-                                    memberMention, channelMention, error.getMessage());
+                                    memberTag, channelMention, error.getMessage());
                         }
                 );
     }
 
-    private void sendLogEmbed(TextChannel logChannel, String memberMention, String channelMention, String errorReason) {
+    private static final Color COLOR_SUCCESS = new Color(0x6A0DAD);
+    private static final Color COLOR_FAILURE = Color.ORANGE;
+
+    private void sendLogEmbed(TextChannel logChannel, String memberTag, String channelMention, String errorReason) {
         if (logChannel == null) return;
 
         boolean success = errorReason == null;
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(success ? "Ban automatique — Succès" : "Ban automatique — Échec")
-                .setColor(success ? Color.RED : Color.ORANGE)
-                .addField("Utilisateur", memberMention, true)
+                .setColor(success ? COLOR_SUCCESS : COLOR_FAILURE)
+                .addField("Utilisateur", memberTag, true)
                 .addField("Salon", channelMention, true);
 
         if (!success) {
