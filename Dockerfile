@@ -1,9 +1,9 @@
-FROM eclipse-temurin:25-jammy AS build
+FROM eclipse-temurin:25-noble AS build
 WORKDIR /src
 COPY . .
 
 RUN ./gradlew clean shadowJar
-FROM eclipse-temurin:25-jammy AS runner
+FROM eclipse-temurin:25-noble AS runner
 RUN mkdir -p /app
 WORKDIR /app
 
