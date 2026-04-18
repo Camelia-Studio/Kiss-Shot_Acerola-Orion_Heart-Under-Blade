@@ -8,4 +8,4 @@ RUN mkdir -p /app
 WORKDIR /app
 COPY --from=build /src/build/libs/kiss-shot-acerola.jar /app/kiss-shot-acerola.jar
 
-CMD ["java", "-jar", "--enable-native-access=ALL-UNNAMED", "kiss-shot-acerola.jar"]
+CMD ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "kiss-shot-acerola.jar"]
