@@ -16,6 +16,13 @@ repositories {
 }
 
 dependencies {
+    implementation("club.minnced:jdave-api:0.1.8")
+
+    // Compiled natives for libdave for the specified platform
+    implementation("club.minnced:jdave-native-linux-x86-64:0.1.8")
+    implementation("club.minnced:jdave-native-linux-aarch64:0.1.8")
+    implementation("club.minnced:jdave-native-win-x86-64:0.1.8")
+    implementation("club.minnced:jdave-native-darwin:0.1.8")
     implementation("org.hibernate.orm:hibernate-core:7.3.1.Final")
     implementation("org.hibernate.orm:hibernate-hikaricp:7.3.1.Final")
     implementation("org.postgresql:postgresql:42.7.10")

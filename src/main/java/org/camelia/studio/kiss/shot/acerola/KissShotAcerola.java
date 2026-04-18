@@ -1,5 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola;
 
+import club.minnced.discord.jdave.interop.JDaveSessionFactory;
+import net.dv8tion.jda.api.audio.AudioModuleConfig;
 import org.camelia.studio.kiss.shot.acerola.db.HibernateConfig;
 import org.camelia.studio.kiss.shot.acerola.listeners.bot.ReadyListener;
 import org.camelia.studio.kiss.shot.acerola.managers.ListenerManager;
@@ -24,6 +26,9 @@ public class KissShotAcerola {
                     .addEventListeners(new ReadyListener())
                     .enableIntents(GatewayIntent.getIntents(GatewayIntent.ALL_INTENTS))
                     .setMemberCachePolicy(MemberCachePolicy.ALL)
+                    .setAudioModuleConfig(
+                            new AudioModuleConfig()
+                                    .withDaveSessionFactory(new JDaveSessionFactory()))
                     .build()
                     .awaitReady();
 
