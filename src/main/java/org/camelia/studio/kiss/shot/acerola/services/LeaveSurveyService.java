@@ -1,6 +1,8 @@
 package org.camelia.studio.kiss.shot.acerola.services;
 
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
@@ -14,8 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -148,18 +148,17 @@ public class LeaveSurveyService {
         }
 
         Duration timeSpent = Duration.between(survey.getJoinedAt(), survey.getLeftAt());
-        String timeStr = formatDuration(timeSpent);
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy 'à' HH:mm")
-            .withZone(ZoneId.of("Europe/Paris"));
-        String dateStr = formatter.format(Instant.now());
+        MessageEmbed embed = new EmbedBuilder()
+            .setTitle("📤 Sondage de départ")
+            .setColor(0xE91E63)
+            .addField("Membre", "@" + survey.getUsername() + " (`" + survey.getDiscordId() + "`)", false)
+            .addField("⏱ Temps passé", formatDuration(timeSpent), true)
+            .addField("✅ Réponse", response, false)
+            .setTimestamp(Instant.now())
+            .build();
 
-        String message = "📤 Sondage de départ — @" + survey.getUsername() + " (ID: " + survey.getDiscordId() + ")\n" +
-            "⏱ Temps passé : " + timeStr + "\n" +
-            "✅ Réponse : \"" + response + "\"\n" +
-            "📅 Le " + dateStr;
-
-        channel.sendMessage(message).queue(
+        channel.sendMessageEmbeds(embed).queue(
             null,
             err -> logger.error("Impossible d'envoyer le log dans le salon {} : {}", logChannelId, err.getMessage())
         );
