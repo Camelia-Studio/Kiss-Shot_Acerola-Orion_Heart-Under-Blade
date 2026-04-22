@@ -1,5 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.MessageUpdateEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
@@ -35,17 +37,25 @@ public class SuppressLinkEmbedListener extends ListenerAdapter {
     }
 
     @Override
+    public void onMessageReceived(@NotNull MessageReceivedEvent event) {
+        if (!event.isFromGuild()) return;
+        if (watchedChannelIds.isEmpty()) return;
+        if (!watchedChannelIds.contains(event.getChannel().getId())) return;
+        suppressIfNeeded(event.getMessage(), event.getChannel().getId());
+    }
+
+    @Override
     public void onMessageUpdate(@NotNull MessageUpdateEvent event) {
         if (!event.isFromGuild()) return;
         if (watchedChannelIds.isEmpty()) return;
         if (!watchedChannelIds.contains(event.getChannel().getId())) return;
+        suppressIfNeeded(event.getMessage(), event.getChannel().getId());
+    }
 
-        var message = event.getMessage();
+    private void suppressIfNeeded(Message message, String channelId) {
         if (message.getEmbeds().isEmpty()) return;
-        if (message.isSuppressedEmbeds()) return;
-
         message.suppressEmbeds(true).queue(
-                success -> logger.info("Intégrations supprimées dans le salon {}", event.getChannel().getId()),
+                success -> logger.info("Intégrations supprimées dans le salon {}", channelId),
                 error -> logger.error("Échec de la suppression des intégrations : {}", error.getMessage())
         );
     }
