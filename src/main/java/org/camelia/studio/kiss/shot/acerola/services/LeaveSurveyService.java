@@ -52,19 +52,11 @@ public class LeaveSurveyService {
     }
 
     private String getDmMessage() {
-        return Configuration.getInstance().getDotenv().get(
-            "LEAVE_SURVEY_DM_MESSAGE",
-            "Nous avons remarqué que tu as quitté Camélia Studio peu après l'avoir rejoint. " +
-            "Si tu as un moment, peux-tu nous dire pourquoi ? Cela nous aide beaucoup à améliorer le serveur 💙"
-        );
+        return Configuration.getInstance().getDotenv().get("LEAVE_SURVEY_DM_MESSAGE");
     }
 
     private String getConfirmMessage() {
-        return Configuration.getInstance().getDotenv().get(
-            "LEAVE_SURVEY_CONFIRM_MESSAGE",
-            "Merci beaucoup ! Nous utiliserons ta réponse afin de faire de Camélia Studio un serveur " +
-            "où chacun puisse bien s'y sentir. N'hésite pas à revenir nous voir à l'occasion ❤️ https://discord.gg/nBuZ9vJ"
-        );
+        return Configuration.getInstance().getDotenv().get("LEAVE_SURVEY_CONFIRM_MESSAGE");
     }
 
     public boolean shouldSendSurvey(Instant joinedAt) {
@@ -77,8 +69,14 @@ public class LeaveSurveyService {
     }
 
     public void sendSurvey(User user, LeaveSurvey survey) {
+        String dmMessage = getDmMessage();
+        if (dmMessage == null || dmMessage.isBlank()) {
+            logger.warn("LEAVE_SURVEY_DM_MESSAGE n'est pas configuré, sondage non envoyé");
+            return;
+        }
+
         user.openPrivateChannel().queue(
-            channel -> channel.sendMessage(getDmMessage())
+            channel -> channel.sendMessage(dmMessage)
                 .setComponents(buildButtons(survey.getId()))
                 .queue(
                     msg -> logger.info("Sondage de départ envoyé à l'utilisateur {}", survey.getId()),
@@ -113,7 +111,13 @@ public class LeaveSurveyService {
         survey.setResponded(true);
         repository.update(survey);
 
-        event.editMessage(getConfirmMessage()).setComponents().queue();
+        String confirmMessage = getConfirmMessage();
+        if (confirmMessage == null || confirmMessage.isBlank()) {
+            logger.warn("LEAVE_SURVEY_CONFIRM_MESSAGE n'est pas configuré, boutons retirés sans confirmation");
+            event.editComponents().queue();
+        } else {
+            event.editMessage(confirmMessage).setComponents().queue();
+        }
 
         logResponse(survey, response, event.getJDA());
     }
