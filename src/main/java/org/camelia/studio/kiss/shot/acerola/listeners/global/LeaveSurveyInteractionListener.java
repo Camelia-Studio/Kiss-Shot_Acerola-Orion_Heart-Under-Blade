@@ -27,7 +27,7 @@ public class LeaveSurveyInteractionListener extends ListenerAdapter {
             long surveyId = Long.parseLong(parts[1]);
             int buttonIndex = Integer.parseInt(parts[2]);
 
-            if (buttonIndex < 0 || buttonIndex >= LeaveSurveyService.DEFAULT_BUTTONS.size()) {
+            if (buttonIndex < 0 || buttonIndex >= service.getButtons().size()) {
                 logger.warn("Index de bouton hors limites : {}", buttonIndex);
                 event.deferEdit().queue();
                 return;

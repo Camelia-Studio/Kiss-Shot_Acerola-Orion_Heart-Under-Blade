@@ -24,14 +24,16 @@ public class LeaveSurveyService {
     private static final Logger logger = LoggerFactory.getLogger(LeaveSurveyService.class);
     private final LeaveSurveyRepository repository = new LeaveSurveyRepository();
 
-    // Configurable via LEAVE_SURVEY_BUTTONS_<n>_EMOJI / LEAVE_SURVEY_BUTTONS_<n>_LABEL
-    // Par défaut, les 4 choix définis dans la spec
-    public static final List<String[]> DEFAULT_BUTTONS = List.of(
-        new String[]{"😕", "J'étais perdu·e / Trop de salons / Mal organisé"},
-        new String[]{"🔗", "J'ai cliqué sur le lien par inadvertance"},
-        new String[]{"😶", "Je ne me suis pas senti·e à l'aise"},
-        new String[]{"⭐", "Cette grognasse de Gachamélia n'a pas fait de moi un 5★ !"}
-    );
+    public List<String> getButtons() {
+        List<String> buttons = new ArrayList<>();
+        int i = 1;
+        String label;
+        while ((label = Configuration.getInstance().getDotenv().get("LEAVE_SURVEY_BUTTON_" + i)) != null && !label.isBlank()) {
+            buttons.add(label);
+            i++;
+        }
+        return buttons;
+    }
 
     private long getThresholdHours() {
         String val = Configuration.getInstance().getDotenv().get("LEAVE_SURVEY_THRESHOLD_HOURS", "24");
@@ -75,9 +77,15 @@ public class LeaveSurveyService {
             return;
         }
 
+        List<ActionRow> rows = buildButtons(survey.getId());
+        if (rows.isEmpty()) {
+            logger.warn("Aucun LEAVE_SURVEY_BUTTON_n configuré, sondage non envoyé");
+            return;
+        }
+
         user.openPrivateChannel().queue(
             channel -> channel.sendMessage(dmMessage)
-                .setComponents(buildButtons(survey.getId()))
+                .setComponents(rows)
                 .queue(
                     msg -> logger.info("Sondage de départ envoyé à l'utilisateur {}", survey.getId()),
                     err -> logger.info("Échec du DM pour le sondage {} : {}", survey.getId(), err.getMessage())
@@ -105,8 +113,8 @@ public class LeaveSurveyService {
             return;
         }
 
-        String[] btn = DEFAULT_BUTTONS.get(buttonIndex);
-        String response = btn[0] + " " + btn[1];
+        List<String> buttons = getButtons();
+        String response = buttons.get(buttonIndex);
         survey.setResponse(response);
         survey.setResponded(true);
         repository.update(survey);
@@ -123,10 +131,10 @@ public class LeaveSurveyService {
     }
 
     private List<ActionRow> buildButtons(Long surveyId) {
+        List<String> labels = getButtons();
         List<Button> buttons = new ArrayList<>();
-        for (int i = 0; i < DEFAULT_BUTTONS.size(); i++) {
-            String[] btn = DEFAULT_BUTTONS.get(i);
-            String label = btn[0] + " " + btn[1];
+        for (int i = 0; i < labels.size(); i++) {
+            String label = labels.get(i);
             if (label.length() > 80) label = label.substring(0, 80);
             buttons.add(Button.secondary("leave_survey:" + surveyId + ":" + i, label));
         }
