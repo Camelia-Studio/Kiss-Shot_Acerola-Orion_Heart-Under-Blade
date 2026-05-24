@@ -2,6 +2,7 @@ package org.camelia.studio.kiss.shot.acerola.services;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -16,13 +17,42 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class LeaveSurveyService {
     private static final Logger logger = LoggerFactory.getLogger(LeaveSurveyService.class);
-    private final LeaveSurveyRepository repository = new LeaveSurveyRepository();
+    private static final LeaveSurveyRepository repository = new LeaveSurveyRepository();
+    private static final ScheduledExecutorService cleanupScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "leave-survey-cleanup");
+        t.setDaemon(true);
+        return t;
+    });
+
+    static {
+        cleanupScheduler.scheduleAtFixedRate(LeaveSurveyService::purgeExpired, 1, 24, TimeUnit.HOURS);
+    }
+
+    private static void purgeExpired() {
+        String val = Configuration.getInstance().getDotenv().get("LEAVE_SURVEY_RESPONSE_TTL_DAYS", "7");
+        long ttlDays;
+        try {
+            ttlDays = Long.parseLong(val);
+        } catch (NumberFormatException e) {
+            ttlDays = 7;
+        }
+        try {
+            int deleted = repository.deleteOlderThan(Instant.now().minus(ttlDays, ChronoUnit.DAYS));
+            if (deleted > 0) logger.info("Purge : {} sondage(s) expiré(s) supprimé(s)", deleted);
+        } catch (Exception e) {
+            logger.error("Erreur lors de la purge des sondages expirés : {}", e.getMessage());
+        }
+    }
 
     public List<String> getButtons() {
         List<String> buttons = new ArrayList<>();
@@ -67,6 +97,7 @@ public class LeaveSurveyService {
 
     public LeaveSurvey createSurvey(String discordId, String username, String guildId, Instant joinedAt, Instant leftAt) {
         LeaveSurvey survey = new LeaveSurvey(discordId, username, guildId, joinedAt, leftAt);
+        survey.setButtonLabels(getButtons());
         return repository.save(survey);
     }
 
@@ -77,7 +108,7 @@ public class LeaveSurveyService {
             return;
         }
 
-        List<ActionRow> rows = buildButtons(survey.getId());
+        List<ActionRow> rows = buildButtons(survey.getId(), survey.getButtonLabels());
         if (rows.isEmpty()) {
             logger.warn("Aucun LEAVE_SURVEY_BUTTON_n configuré, sondage non envoyé");
             return;
@@ -113,11 +144,20 @@ public class LeaveSurveyService {
             return;
         }
 
-        List<String> buttons = getButtons();
-        String response = buttons.get(buttonIndex);
-        survey.setResponse(response);
-        survey.setResponded(true);
-        repository.update(survey);
+        List<String> buttonLabels = survey.getButtonLabels();
+        if (buttonIndex < 0 || buttonIndex >= buttonLabels.size()) {
+            logger.warn("Index de bouton hors limites pour le sondage {} : {}", surveyId, buttonIndex);
+            event.deferEdit().queue();
+            return;
+        }
+
+        String response = buttonLabels.get(buttonIndex);
+
+        Optional<LeaveSurvey> updated = repository.markAsRespondedIfPending(surveyId, response);
+        if (updated.isEmpty()) {
+            event.deferEdit().queue();
+            return;
+        }
 
         String confirmMessage = getConfirmMessage();
         if (confirmMessage == null || confirmMessage.isBlank()) {
@@ -127,11 +167,10 @@ public class LeaveSurveyService {
             event.editMessage(confirmMessage).setComponents().queue();
         }
 
-        logResponse(survey, response, event.getJDA());
+        logResponse(updated.get(), response, event.getJDA());
     }
 
-    private List<ActionRow> buildButtons(Long surveyId) {
-        List<String> labels = getButtons();
+    private List<ActionRow> buildButtons(Long surveyId, List<String> labels) {
         List<Button> buttons = new ArrayList<>();
         for (int i = 0; i < labels.size(); i++) {
             String label = labels.get(i);
@@ -161,10 +200,14 @@ public class LeaveSurveyService {
 
         Duration timeSpent = Duration.between(survey.getJoinedAt(), survey.getLeftAt());
 
+        Guild guild = jda.getGuildById(survey.getGuildId());
+        String guildName = guild != null ? guild.getName() : survey.getGuildId();
+
         MessageEmbed embed = new EmbedBuilder()
             .setTitle("📤 Sondage de départ")
             .setColor(0xE91E63)
             .addField("Membre", "@" + survey.getUsername() + " (`" + survey.getDiscordId() + "`)", false)
+            .addField("🏠 Serveur", guildName, true)
             .addField("⏱ Temps passé", formatDuration(timeSpent), true)
             .addField("✅ Réponse", response, false)
             .setTimestamp(Instant.now())

@@ -13,3 +13,6 @@ build
 .project
 .settings/
 /bin
+
+CLAUDE.md
+AGENTS.md

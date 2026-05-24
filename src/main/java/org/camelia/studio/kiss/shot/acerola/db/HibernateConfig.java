@@ -27,7 +27,8 @@ public class HibernateConfig {
                 Properties props = new Properties();
 
                 // Configuration Hibernate
-                props.put(Environment.HBM2DDL_AUTO, "update"); // On utilise validate au lieu de update
+                String ddlAuto = dotenv.get("DB_DDL_AUTO", "update");
+                props.put(Environment.HBM2DDL_AUTO, ddlAuto);
 
                 props.put(Environment.GLOBALLY_QUOTED_IDENTIFIERS, "true");
 

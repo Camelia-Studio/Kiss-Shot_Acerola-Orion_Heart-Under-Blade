@@ -2,14 +2,18 @@ package org.camelia.studio.kiss.shot.acerola.models;
 
 import jakarta.persistence.*;
 import org.camelia.studio.kiss.shot.acerola.interfaces.IEntity;
+import org.camelia.studio.kiss.shot.acerola.utils.StringListConverter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "leave_surveys")
-public class LeaveSurvey implements IEntity {
+public class
+LeaveSurvey implements IEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,6 +40,10 @@ public class LeaveSurvey implements IEntity {
     @Column(name = "responded", nullable = false)
     private boolean responded = false;
 
+    @Convert(converter = StringListConverter.class)
+    @Column(name = "buttonLabels", columnDefinition = "TEXT")
+    private List<String> buttonLabels = new ArrayList<>();
+
     @CreationTimestamp
     @Column(name = "createdAt")
     private LocalDateTime createdAt;
@@ -60,6 +68,9 @@ public class LeaveSurvey implements IEntity {
     public boolean isResponded() { return responded; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 
+    public List<String> getButtonLabels() { return buttonLabels; }
+
     public void setResponse(String response) { this.response = response; }
     public void setResponded(boolean responded) { this.responded = responded; }
+    public void setButtonLabels(List<String> buttonLabels) { this.buttonLabels = buttonLabels; }
 }
