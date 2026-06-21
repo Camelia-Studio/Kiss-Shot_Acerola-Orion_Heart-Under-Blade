@@ -31,11 +31,18 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.32")
     implementation("dev.arbjerg:lavaplayer:2.2.6")
     implementation("jakarta.annotation:jakarta.annotation-api:3.0.0")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.named<Jar>("shadowJar") {
