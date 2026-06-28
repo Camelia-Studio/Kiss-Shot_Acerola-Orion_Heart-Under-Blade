@@ -2,6 +2,7 @@ package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyFileAttachment;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkCache;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -98,7 +100,11 @@ public class FxTwitterSite implements SaucySite {
                 return Optional.of(fallback(tweet, id, user));
             }
 
-            SaucyFileAttachment file = new SaucyFileAttachment(fileName(video.url(), id), bytes, contentType(video));
+            SaucyFileAttachment file = new SaucyFileAttachment(
+                    fileName(video.url(), "tweet-" + id + ".mp4"),
+                    bytes,
+                    contentType(video)
+            );
             return Optional.of(new SaucyProcessResponse(
                     null,
                     List.of(embed(tweet, null)),
@@ -109,10 +115,17 @@ public class FxTwitterSite implements SaucySite {
 
         List<String> photoUrls = photoUrls(tweet);
         if (!photoUrls.isEmpty()) {
-            List<MessageEmbed> embeds = photoUrls.stream()
-                    .map(photoUrl -> embed(tweet, originalPhotoUrl(photoUrl)))
+            List<String> originalPhotoUrls = photoUrls.stream()
+                    .map(FxTwitterSite::originalPhotoUrl)
                     .toList();
-            return Optional.of(new SaucyProcessResponse(null, embeds, List.of(), sensitive(tweet)));
+            List<SaucyFileAttachment> files = photoAttachments(originalPhotoUrls, id);
+            String fallbackImageUrl = files.isEmpty() ? originalPhotoUrls.getFirst() : null;
+            return Optional.of(new SaucyProcessResponse(
+                    null,
+                    List.of(embed(tweet, fallbackImageUrl)),
+                    files,
+                    sensitive(tweet)
+            ));
         }
 
         return Optional.of(new SaucyProcessResponse(
@@ -121,6 +134,30 @@ public class FxTwitterSite implements SaucySite {
                 List.of(),
                 sensitive(tweet)
         ));
+    }
+
+    private List<SaucyFileAttachment> photoAttachments(List<String> urls, String id) {
+        List<SaucyFileAttachment> files = new ArrayList<>();
+        for (int index = 0; index < urls.size() && files.size() < Message.MAX_FILE_AMOUNT; index++) {
+            String url = urls.get(index);
+            long contentLength = gateway.contentLength(url);
+            if (contentLength > config.maxFileBytes()) {
+                continue;
+            }
+
+            byte[] bytes = gateway.download(url, config.maxFileBytes());
+            if (bytes.length == 0 || bytes.length > config.maxFileBytes()) {
+                continue;
+            }
+
+            files.add(new SaucyFileAttachment(
+                    fileName(url, "tweet-" + id + "-" + (index + 1)),
+                    bytes,
+                    imageContentType(url)
+            ));
+        }
+
+        return List.copyOf(files);
     }
 
     private static SaucyProcessResponse fallback(FxTwitterTweet tweet, String id, String user) {
@@ -217,7 +254,7 @@ public class FxTwitterSite implements SaucySite {
         }
     }
 
-    private static String fileName(String url, String id) {
+    private static String fileName(String url, String fallback) {
         try {
             String path = new URI(url).getPath();
             if (path != null) {
@@ -230,7 +267,7 @@ public class FxTwitterSite implements SaucySite {
         } catch (IllegalArgumentException | URISyntaxException ignored) {
         }
 
-        return "tweet-" + id + ".mp4";
+        return fallback;
     }
 
     private static String contentType(FxTwitterVideo video) {
@@ -239,6 +276,33 @@ public class FxTwitterSite implements SaucySite {
         }
 
         return "video/mp4";
+    }
+
+    private static String imageContentType(String url) {
+        String path = "";
+        try {
+            path = Optional.ofNullable(new URI(url).getPath()).orElse("");
+        } catch (IllegalArgumentException | URISyntaxException ignored) {
+        }
+
+        String normalized = path.toLowerCase(Locale.ROOT);
+        if (normalized.endsWith(".png")) {
+            return "image/png";
+        }
+        if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg")) {
+            return "image/jpeg";
+        }
+        if (normalized.endsWith(".gif")) {
+            return "image/gif";
+        }
+        if (normalized.endsWith(".webp")) {
+            return "image/webp";
+        }
+        if (normalized.endsWith(".avif")) {
+            return "image/avif";
+        }
+
+        return "application/octet-stream";
     }
 
     private static String authorUrl(FxTwitterAuthor author) {

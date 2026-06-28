@@ -65,6 +65,26 @@ class SaucyMessagePartitionerTest {
     }
 
     @Test
+    void embedAndFilesStayInTheSameOutboundMessageWhenTheyFit() {
+        SaucyMessagePartitioner partitioner = new SaucyMessagePartitioner(4, 10);
+        MessageEmbed embed = embed("metadata");
+        SaucyFileAttachment first = file("first", 4);
+        SaucyFileAttachment second = file("second", 6);
+        SaucyProcessResponse response = new SaucyProcessResponse(
+                null,
+                List.of(embed),
+                List.of(first, second),
+                false
+        );
+
+        List<SaucyOutboundMessage> messages = partitioner.partition(response);
+
+        assertEquals(1, messages.size());
+        assertEquals(List.of(embed), messages.getFirst().embeds());
+        assertEquals(List.of(first, second), messages.getFirst().files());
+    }
+
+    @Test
     void filesAreChunkedByDiscordMaximumFileCount() {
         SaucyMessagePartitioner partitioner = new SaucyMessagePartitioner(4, 100);
         List<SaucyFileAttachment> files = new ArrayList<>();

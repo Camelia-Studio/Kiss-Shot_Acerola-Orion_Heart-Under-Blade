@@ -29,19 +29,52 @@ public class SaucyMessagePartitioner {
             addIfNotEmpty(messages, new SaucyOutboundMessage(response.text(), List.of(), List.of()));
         }
 
-        for (int index = 0; index < response.embeds().size(); index += maxEmbedsPerMessage) {
-            int end = Math.min(index + maxEmbedsPerMessage, response.embeds().size());
-            List<MessageEmbed> embeds = response.embeds().subList(index, end);
+        List<List<MessageEmbed>> embedChunks = embedChunks(response.embeds());
+        List<List<SaucyFileAttachment>> fileChunks = fileChunks(response.files());
+
+        if (!embedChunks.isEmpty() && !fileChunks.isEmpty()) {
+            addIfNotEmpty(messages, new SaucyOutboundMessage(null, embedChunks.getFirst(), fileChunks.getFirst()));
+
+            for (int index = 1; index < embedChunks.size(); index++) {
+                addIfNotEmpty(messages, new SaucyOutboundMessage(null, embedChunks.get(index), List.of()));
+            }
+            for (int index = 1; index < fileChunks.size(); index++) {
+                addIfNotEmpty(messages, new SaucyOutboundMessage(null, List.of(), fileChunks.get(index)));
+            }
+
+            return List.copyOf(messages);
+        }
+
+        for (List<MessageEmbed> embeds : embedChunks) {
             addIfNotEmpty(messages, new SaucyOutboundMessage(null, embeds, List.of()));
         }
 
+        for (List<SaucyFileAttachment> files : fileChunks) {
+            addIfNotEmpty(messages, new SaucyOutboundMessage(null, List.of(), files));
+        }
+
+        return List.copyOf(messages);
+    }
+
+    private List<List<MessageEmbed>> embedChunks(List<MessageEmbed> embeds) {
+        List<List<MessageEmbed>> chunks = new ArrayList<>();
+        for (int index = 0; index < embeds.size(); index += maxEmbedsPerMessage) {
+            int end = Math.min(index + maxEmbedsPerMessage, embeds.size());
+            chunks.add(List.copyOf(embeds.subList(index, end)));
+        }
+
+        return chunks;
+    }
+
+    private List<List<SaucyFileAttachment>> fileChunks(List<SaucyFileAttachment> files) {
+        List<List<SaucyFileAttachment>> chunks = new ArrayList<>();
         List<SaucyFileAttachment> currentFiles = new ArrayList<>();
         long currentBytes = 0;
 
-        for (SaucyFileAttachment file : response.files()) {
+        for (SaucyFileAttachment file : files) {
             if (file.size() > maxFileBytes) {
-                flushFiles(messages, currentFiles);
-                addIfNotEmpty(messages, new SaucyOutboundMessage(null, List.of(), List.of(file)));
+                flushFiles(chunks, currentFiles);
+                chunks.add(List.of(file));
                 currentBytes = 0;
                 continue;
             }
@@ -49,7 +82,7 @@ public class SaucyMessagePartitioner {
             if (!currentFiles.isEmpty()
                     && (currentBytes + file.size() > maxFileBytes
                     || currentFiles.size() >= Message.MAX_FILE_AMOUNT)) {
-                flushFiles(messages, currentFiles);
+                flushFiles(chunks, currentFiles);
                 currentBytes = 0;
             }
 
@@ -57,13 +90,15 @@ public class SaucyMessagePartitioner {
             currentBytes += file.size();
         }
 
-        flushFiles(messages, currentFiles);
+        flushFiles(chunks, currentFiles);
 
-        return List.copyOf(messages);
+        return chunks;
     }
 
-    private static void flushFiles(List<SaucyOutboundMessage> messages, List<SaucyFileAttachment> files) {
-        addIfNotEmpty(messages, new SaucyOutboundMessage(null, List.of(), files));
+    private static void flushFiles(List<List<SaucyFileAttachment>> chunks, List<SaucyFileAttachment> files) {
+        if (!files.isEmpty()) {
+            chunks.add(List.copyOf(files));
+        }
         files.clear();
     }
 
