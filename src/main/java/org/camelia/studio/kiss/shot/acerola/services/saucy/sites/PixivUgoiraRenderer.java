@@ -1,5 +1,8 @@
 package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -30,6 +33,7 @@ interface PixivUgoiraFfmpegRunner {
 }
 
 public class PixivUgoiraRenderer implements PixivUgoiraRendererGateway {
+    private static final Logger logger = LoggerFactory.getLogger(PixivUgoiraRenderer.class);
     private static final Duration FFMPEG_TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_FRAMES = 500;
     private static final long MAX_TOTAL_DURATION_MILLIS = 120_000L;
@@ -88,8 +92,20 @@ public class PixivUgoiraRenderer implements PixivUgoiraRendererGateway {
                     output.toString()
             );
 
-            int exitCode = ffmpegRunner.run(command, FFMPEG_TIMEOUT);
+            int exitCode;
+            try {
+                exitCode = ffmpegRunner.run(command, FFMPEG_TIMEOUT);
+            } catch (IOException exception) {
+                logger.warn(
+                        "Rendu ugoira Pixiv impossible: FFmpeg est introuvable ou inaccessible. "
+                                + "Installez ffmpeg et vérifiez qu'il est disponible dans le PATH du bot.",
+                        exception
+                );
+                return Optional.empty();
+            }
+
             if (exitCode != 0 || !Files.isRegularFile(output)) {
+                logger.warn("Rendu ugoira Pixiv impossible: FFmpeg a échoué avec le code {}.", exitCode);
                 return Optional.empty();
             }
 

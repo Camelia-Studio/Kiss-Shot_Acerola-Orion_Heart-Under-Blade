@@ -1,6 +1,10 @@
 package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -121,6 +125,32 @@ class PixivUgoiraRendererTest {
         assertFalse(Files.exists(runner.tempDir));
     }
 
+    @Test
+    void logsActionableWarningWhenFfmpegCannotStart() throws IOException {
+        ThrowingFfmpegRunner runner = new ThrowingFfmpegRunner(new IOException("Cannot run program \"ffmpeg\""));
+        PixivUgoiraRenderer renderer = new PixivUgoiraRenderer(runner);
+        ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ListAppender<>();
+        Logger logger = (Logger) LoggerFactory.getLogger(PixivUgoiraRenderer.class);
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            Optional<byte[]> result = renderer.render(zipBytes(
+                    entry("000000.jpg", new byte[]{1}),
+                    entry("000001.jpg", new byte[]{2})
+            ), metadata(), "mp4", 1500, 1024);
+
+            assertTrue(result.isEmpty());
+            assertTrue(appender.list.stream().anyMatch(event ->
+                    event.getLevel() == Level.WARN
+                            && event.getFormattedMessage().contains("FFmpeg")
+                            && event.getFormattedMessage().contains("PATH")
+            ));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
     private static PixivUgoiraMetadata metadata() {
         return new PixivUgoiraMetadata(
                 "https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip",
@@ -178,6 +208,19 @@ class PixivUgoiraRendererTest {
             Files.deleteIfExists(siblingEscapeFile);
             Files.write(Path.of(command.getLast()), outputBytes);
             return exitCode;
+        }
+    }
+
+    private static final class ThrowingFfmpegRunner implements PixivUgoiraFfmpegRunner {
+        private final IOException exception;
+
+        private ThrowingFfmpegRunner(IOException exception) {
+            this.exception = exception;
+        }
+
+        @Override
+        public int run(List<String> command, Duration timeout) throws IOException {
+            throw exception;
         }
     }
 }
