@@ -149,7 +149,8 @@ public class PixivSite implements SaucySite {
                 zipBytes.get(),
                 metadata,
                 format,
-                config.pixivUgoiraBitrate()
+                config.pixivUgoiraBitrate(),
+                config.maxFileBytes()
         );
         if (renderedBytes.isEmpty()
                 || renderedBytes.get().length == 0

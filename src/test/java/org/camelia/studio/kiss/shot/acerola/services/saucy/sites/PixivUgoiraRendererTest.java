@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -30,11 +31,13 @@ class PixivUgoiraRendererTest {
                 ),
                 metadata(),
                 "mp4",
-                1500
+                1500,
+                1024
         );
 
         assertTrue(result.isPresent());
         assertArrayEquals(renderedBytes, result.orElseThrow());
+        assertEquals(Duration.ofSeconds(30), runner.timeout);
         assertEquals("ffmpeg", runner.command.getFirst());
         assertEquals("-y", runner.command.get(1));
         assertEquals("-f", runner.command.get(2));
@@ -67,9 +70,54 @@ class PixivUgoiraRendererTest {
         Optional<byte[]> result = renderer.render(zipBytes(
                 entry("000000.jpg", new byte[]{1}),
                 entry("000001.jpg", new byte[]{2})
-        ), metadata(), "mp4", 1500);
+        ), metadata(), "mp4", 1500, 1024);
 
         assertTrue(result.isEmpty());
+        assertFalse(Files.exists(runner.tempDir));
+    }
+
+    @Test
+    void returnsEmptyBeforeFfmpegWhenExtractedFrameExceedsMaxBytes() throws IOException {
+        FakeFfmpegRunner runner = new FakeFfmpegRunner(new byte[]{9, 8, 7});
+        PixivUgoiraRenderer renderer = new PixivUgoiraRenderer(runner);
+
+        Optional<byte[]> result = renderer.render(zipBytes(
+                entry("000000.jpg", new byte[]{1, 2, 3, 4, 5}),
+                entry("000001.jpg", new byte[]{1})
+        ), metadata(), "mp4", 1500, 4);
+
+        assertTrue(result.isEmpty());
+        assertEquals(null, runner.command);
+        assertEquals(null, runner.tempDir);
+    }
+
+    @Test
+    void returnsEmptyWhenFfmpegOutputExceedsMaxBytes() throws IOException {
+        FakeFfmpegRunner runner = new FakeFfmpegRunner(new byte[]{1, 2, 3, 4, 5});
+        PixivUgoiraRenderer renderer = new PixivUgoiraRenderer(runner);
+
+        Optional<byte[]> result = renderer.render(zipBytes(
+                entry("000000.jpg", new byte[]{1}),
+                entry("000001.jpg", new byte[]{2})
+        ), metadata(), "mp4", 1500, 4);
+
+        assertTrue(result.isEmpty());
+        assertFalse(Files.exists(runner.tempDir));
+    }
+
+    @Test
+    void returnsEmptyWhenFfmpegRunnerReportsTimeout() throws IOException {
+        FakeFfmpegRunner runner = new FakeFfmpegRunner(new byte[]{9, 8, 7});
+        runner.exitCode = -1;
+        PixivUgoiraRenderer renderer = new PixivUgoiraRenderer(runner);
+
+        Optional<byte[]> result = renderer.render(zipBytes(
+                entry("000000.jpg", new byte[]{1}),
+                entry("000001.jpg", new byte[]{2})
+        ), metadata(), "mp4", 1500, 1024);
+
+        assertTrue(result.isEmpty());
+        assertEquals(Duration.ofSeconds(30), runner.timeout);
         assertFalse(Files.exists(runner.tempDir));
     }
 
@@ -108,6 +156,7 @@ class PixivUgoiraRendererTest {
     private static final class FakeFfmpegRunner implements PixivUgoiraFfmpegRunner {
         private final byte[] outputBytes;
         private List<String> command;
+        private Duration timeout;
         private String concat;
         private Path tempDir;
         private boolean siblingEscapeFileExisted;
@@ -118,8 +167,9 @@ class PixivUgoiraRendererTest {
         }
 
         @Override
-        public int run(List<String> command) throws IOException {
+        public int run(List<String> command, Duration timeout) throws IOException {
             this.command = List.copyOf(command);
+            this.timeout = timeout;
             Path concatPath = Path.of(command.get(5));
             tempDir = concatPath.getParent();
             concat = Files.readString(concatPath);

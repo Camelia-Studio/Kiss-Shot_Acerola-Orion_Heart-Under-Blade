@@ -207,6 +207,7 @@ class PixivSiteTest {
         assertArrayEquals(zipBytes, renderer.lastZipBytes);
         assertEquals("mp4", renderer.lastFormat);
         assertEquals(2000, renderer.lastBitrate);
+        assertEquals(1024, renderer.lastMaxBytes);
         assertEquals(1, response.files().size());
     }
 
@@ -409,17 +410,25 @@ class PixivSiteTest {
         private byte[] lastZipBytes;
         private String lastFormat;
         private int lastBitrate;
+        private long lastMaxBytes;
 
         private void renderedBytes(byte[] renderedBytes) {
             this.renderedBytes = renderedBytes;
         }
 
         @Override
-        public Optional<byte[]> render(byte[] zipBytes, PixivUgoiraMetadata metadata, String format, int bitrate) {
+        public Optional<byte[]> render(
+                byte[] zipBytes,
+                PixivUgoiraMetadata metadata,
+                String format,
+                int bitrate,
+                long maxBytes
+        ) {
             renderRequests++;
             lastZipBytes = zipBytes;
             lastFormat = format;
             lastBitrate = bitrate;
+            lastMaxBytes = maxBytes;
             return Optional.of(renderedBytes);
         }
     }
