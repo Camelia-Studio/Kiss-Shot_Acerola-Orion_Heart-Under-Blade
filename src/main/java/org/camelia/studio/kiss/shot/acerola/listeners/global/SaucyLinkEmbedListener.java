@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 public class SaucyLinkEmbedListener extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(SaucyLinkEmbedListener.class);
@@ -53,13 +54,22 @@ public class SaucyLinkEmbedListener extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
-        if (!config.enabled()) return;
-        if (!event.isFromGuild()) return;
-        if (event.getAuthor().isBot()) return;
-
         String content = event.getMessage().getContentRaw();
-        if (content == null || content.isBlank()) return;
-        if (SaucyIgnoredContent.hasIgnoredLink(content)) return;
+        Optional<String> ignoreReason = ignoreReason(
+                config.enabled(),
+                event.isFromGuild(),
+                event.getAuthor().isBot(),
+                content
+        );
+        if (ignoreReason.isPresent()) {
+            logger.debug(
+                    "Ignoring saucy processing for message {} in channel {}: {}",
+                    event.getMessageId(),
+                    event.getChannel().getId(),
+                    ignoreReason.get()
+            );
+            return;
+        }
 
         siteManager.process(content)
                 .thenAccept(responses -> sender.send(event.getMessage(), responses))
@@ -72,5 +82,25 @@ public class SaucyLinkEmbedListener extends ListenerAdapter {
                     );
                     return null;
                 });
+    }
+
+    static Optional<String> ignoreReason(boolean enabled, boolean fromGuild, boolean authorBot, String content) {
+        if (!enabled) {
+            return Optional.of("saucy link embeds are disabled");
+        }
+        if (!fromGuild) {
+            return Optional.of("message is outside a guild");
+        }
+        if (authorBot) {
+            return Optional.of("author is a bot");
+        }
+        if (content == null || content.isBlank()) {
+            return Optional.of("message content is blank");
+        }
+        if (SaucyIgnoredContent.hasIgnoredLink(content)) {
+            return Optional.of("link is explicitly ignored");
+        }
+
+        return Optional.empty();
     }
 }

@@ -51,6 +51,12 @@ public class SaucySiteManager {
 
     public CompletableFuture<List<SaucyProcessResponse>> process(String content) {
         List<SaucyMatch> matches = match(content);
+        if (matches.isEmpty()) {
+            logger.debug("Ignoring saucy content: no supported link matched");
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        logger.info("Starting saucy processing for {} matched link(s)", matches.size());
         return CompletableFuture.supplyAsync(() -> {
             List<SaucyProcessResponse> responses = new ArrayList<>();
 
@@ -62,9 +68,20 @@ public class SaucySiteManager {
                 }
 
                 try {
+                    logger.debug("Starting saucy match {} for site {}", match.url(), match.siteId());
                     Optional<SaucyProcessResponse> response = site.process(match).join();
-                    response.filter(processResponse -> !processResponse.isEmpty())
-                            .ifPresent(responses::add);
+                    if (response.isEmpty()) {
+                        logger.info("Ignoring saucy match {} for site {}: no response", match.url(), match.siteId());
+                        continue;
+                    }
+
+                    SaucyProcessResponse processResponse = response.get();
+                    if (processResponse.isEmpty()) {
+                        logger.info("Ignoring saucy match {} for site {}: empty response", match.url(), match.siteId());
+                        continue;
+                    }
+
+                    responses.add(processResponse);
                 } catch (CompletionException exception) {
                     logger.warn("Failed to process saucy match {}", match.url(), exception.getCause());
                 } catch (RuntimeException exception) {
