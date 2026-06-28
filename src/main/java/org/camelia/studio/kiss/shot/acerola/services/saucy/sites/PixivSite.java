@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 
 public class PixivSite implements SaucySite {
     private static final String ID = "pixiv";
+    private static final int SENSITIVE_SAFETY_LEVEL = 6;
     private static final Pattern URL_PATTERN = Pattern.compile(
             "(?i:https?://(?:www\\.)?pixiv\\.net)/(?:[^\\s<>)\\].,!?:;]+/)*artworks/" +
                     "(?<id>\\d+)/?(?=$|[\\s<>)\\].,!?:;]|\\?)"
@@ -123,7 +124,7 @@ public class PixivSite implements SaucySite {
                 text,
                 List.of(),
                 files,
-                illustration.xRestrict() > 0
+                isSensitive(illustration)
         ));
     }
 
@@ -167,8 +168,12 @@ public class PixivSite implements SaucySite {
                 null,
                 List.of(),
                 List.of(file),
-                illustration.xRestrict() > 0
+                isSensitive(illustration)
         ));
+    }
+
+    private static boolean isSensitive(PixivIllustration illustration) {
+        return illustration.xRestrict() > 0 || illustration.sl() >= SENSITIVE_SAFETY_LEVEL;
     }
 
     private List<ImageCandidates> multiPageCandidates(String id, int pageCount) {

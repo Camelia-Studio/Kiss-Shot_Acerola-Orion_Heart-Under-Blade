@@ -1,11 +1,13 @@
 package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyFileAttachment;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyMatch;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyProcessResponse;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +129,21 @@ class PixivSiteTest {
         PixivSite site = new PixivSite(gateway, config("session", 1024, 5));
 
         SaucyProcessResponse response = site.process(match("106848609")).join().orElseThrow();
+
+        assertTrue(response.sensitive());
+        assertEquals(1, response.files().size());
+    }
+
+    @Test
+    void marksHighSafetyLevelIllustrationAsSensitive() throws IOException {
+        FakePixivGateway gateway = new FakePixivGateway();
+        String original = imageUrl(0, "jpg");
+        gateway.details(illustrationFromJson("145045626", 0, 1, 0, 6, original));
+        gateway.length(original, 10);
+        gateway.download(original, new byte[]{1});
+        PixivSite site = new PixivSite(gateway, config("session", 1024, 5));
+
+        SaucyProcessResponse response = site.process(match("145045626")).join().orElseThrow();
 
         assertTrue(response.sensitive());
         assertEquals(1, response.files().size());
@@ -287,6 +304,40 @@ class PixivSiteTest {
                 xRestrict,
                 urls
         ));
+    }
+
+    private static PixivIllustrationResponse illustrationFromJson(
+            String id,
+            int illustType,
+            int pageCount,
+            int xRestrict,
+            int sl,
+            String original
+    ) throws IOException {
+        String json = """
+                {
+                  "error": false,
+                  "message": "",
+                  "body": {
+                    "id": "%s",
+                    "title": "Title",
+                    "description": "Description",
+                    "illustType": %d,
+                    "pageCount": %d,
+                    "xRestrict": %d,
+                    "sl": %d,
+                    "urls": {
+                      "mini": "mini",
+                      "thumb": "thumb",
+                      "small": "small",
+                      "regular": "regular",
+                      "original": "%s"
+                    }
+                  }
+                }
+                """.formatted(id, illustType, pageCount, xRestrict, sl, original);
+
+        return new ObjectMapper().readValue(json, PixivIllustrationResponse.class);
     }
 
     private static PixivIllustrationUrls urls(String original, String regular, String small, String thumb) {

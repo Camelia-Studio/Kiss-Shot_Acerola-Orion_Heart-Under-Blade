@@ -21,8 +21,20 @@ record PixivIllustration(
         @JsonProperty("illustType") int illustType,
         @JsonProperty("pageCount") int pageCount,
         @JsonProperty("xRestrict") int xRestrict,
-        @JsonProperty("urls") PixivIllustrationUrls urls
+        @JsonProperty("urls") PixivIllustrationUrls urls,
+        @JsonProperty("sl") int sl
 ) {
+    PixivIllustration(
+            String id,
+            String title,
+            String description,
+            int illustType,
+            int pageCount,
+            int xRestrict,
+            PixivIllustrationUrls urls
+    ) {
+        this(id, title, description, illustType, pageCount, xRestrict, urls, 0);
+    }
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
