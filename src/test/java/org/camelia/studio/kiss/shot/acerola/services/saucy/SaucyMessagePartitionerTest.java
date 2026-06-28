@@ -4,6 +4,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,6 +62,22 @@ class SaucyMessagePartitionerTest {
         assertEquals(List.of(first, second), messages.get(0).files());
         assertEquals(List.of(third), messages.get(1).files());
         assertEquals(List.of(fourth), messages.get(2).files());
+    }
+
+    @Test
+    void filesAreChunkedByDiscordMaximumFileCount() {
+        SaucyMessagePartitioner partitioner = new SaucyMessagePartitioner(4, 100);
+        List<SaucyFileAttachment> files = new ArrayList<>();
+        for (int index = 0; index < 11; index++) {
+            files.add(file("file-" + index, 1));
+        }
+        SaucyProcessResponse response = new SaucyProcessResponse(null, List.of(), files, false);
+
+        List<SaucyOutboundMessage> messages = partitioner.partition(response);
+
+        assertEquals(2, messages.size());
+        assertEquals(10, messages.get(0).files().size());
+        assertEquals(1, messages.get(1).files().size());
     }
 
     @Test

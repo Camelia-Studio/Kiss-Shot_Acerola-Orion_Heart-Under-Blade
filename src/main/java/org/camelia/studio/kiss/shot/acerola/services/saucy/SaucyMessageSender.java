@@ -3,6 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.services.saucy;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.attribute.IAgeRestrictedChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.utils.FileUpload;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
@@ -44,6 +45,7 @@ public class SaucyMessageSender {
         AtomicReference<Message> temporaryMessage = new AtomicReference<>();
         AtomicBoolean finalDispatchComplete = new AtomicBoolean(false);
         AtomicBoolean finalMessageSucceeded = new AtomicBoolean(false);
+        AtomicBoolean finalMessageFailed = new AtomicBoolean(false);
         AtomicInteger pendingFinalMessages = new AtomicInteger(messages.size());
 
         sendTemporaryMessage(sourceMessage, temporaryMessage, finalDispatchComplete);
@@ -54,6 +56,7 @@ public class SaucyMessageSender {
                     message,
                     pendingFinalMessages,
                     finalMessageSucceeded,
+                    finalMessageFailed,
                     finalDispatchComplete,
                     temporaryMessage
             );
@@ -119,6 +122,7 @@ public class SaucyMessageSender {
             SaucyOutboundMessage message,
             AtomicInteger pendingFinalMessages,
             AtomicBoolean finalMessageSucceeded,
+            AtomicBoolean finalMessageFailed,
             AtomicBoolean finalDispatchComplete,
             AtomicReference<Message> temporaryMessage
     ) {
@@ -131,6 +135,7 @@ public class SaucyMessageSender {
                                     sourceMessage,
                                     pendingFinalMessages,
                                     finalMessageSucceeded,
+                                    finalMessageFailed,
                                     finalDispatchComplete,
                                     temporaryMessage,
                                     true
@@ -146,6 +151,7 @@ public class SaucyMessageSender {
                                         sourceMessage,
                                         pendingFinalMessages,
                                         finalMessageSucceeded,
+                                        finalMessageFailed,
                                         finalDispatchComplete,
                                         temporaryMessage,
                                         false
@@ -163,6 +169,7 @@ public class SaucyMessageSender {
                     sourceMessage,
                     pendingFinalMessages,
                     finalMessageSucceeded,
+                    finalMessageFailed,
                     finalDispatchComplete,
                     temporaryMessage,
                     false
@@ -192,12 +199,15 @@ public class SaucyMessageSender {
             Message sourceMessage,
             AtomicInteger pendingFinalMessages,
             AtomicBoolean finalMessageSucceeded,
+            AtomicBoolean finalMessageFailed,
             AtomicBoolean finalDispatchComplete,
             AtomicReference<Message> temporaryMessage,
             boolean succeeded
     ) {
         if (succeeded) {
             finalMessageSucceeded.set(true);
+        } else {
+            finalMessageFailed.set(true);
         }
 
         if (pendingFinalMessages.decrementAndGet() != 0) {
@@ -207,7 +217,7 @@ public class SaucyMessageSender {
         finalDispatchComplete.set(true);
         deleteTemporaryMessageIfPresent(temporaryMessage, sourceMessage);
 
-        if (finalMessageSucceeded.get()) {
+        if (shouldSuppressSourceEmbeds(finalMessageSucceeded.get(), finalMessageFailed.get())) {
             suppressSourceEmbeds(sourceMessage);
         }
     }
@@ -268,7 +278,28 @@ public class SaucyMessageSender {
     }
 
     private boolean isNsfw(Message sourceMessage) {
-        return sourceMessage.getGuildChannel() instanceof IAgeRestrictedChannel ageRestricted && ageRestricted.isNSFW();
+        return isNsfwChannel(sourceMessage.getGuildChannel());
+    }
+
+    static boolean shouldSuppressSourceEmbeds(boolean finalMessageSucceeded, boolean finalMessageFailed) {
+        return finalMessageSucceeded && !finalMessageFailed;
+    }
+
+    static boolean isNsfwChannel(GuildChannel channel) {
+        if (channel instanceof IAgeRestrictedChannel ageRestricted && ageRestricted.isNSFW()) {
+            return true;
+        }
+
+        if (channel instanceof ThreadChannel threadChannel) {
+            try {
+                return threadChannel.getParentChannel() instanceof IAgeRestrictedChannel ageRestricted
+                        && ageRestricted.isNSFW();
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private void logSkippedSensitiveResponses(

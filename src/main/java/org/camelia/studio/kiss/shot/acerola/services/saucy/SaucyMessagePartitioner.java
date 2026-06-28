@@ -1,5 +1,6 @@
 package org.camelia.studio.kiss.shot.acerola.services.saucy;
 
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 
 import java.util.ArrayList;
@@ -45,7 +46,9 @@ public class SaucyMessagePartitioner {
                 continue;
             }
 
-            if (!currentFiles.isEmpty() && currentBytes + file.size() > maxFileBytes) {
+            if (!currentFiles.isEmpty()
+                    && (currentBytes + file.size() > maxFileBytes
+                    || currentFiles.size() >= Message.MAX_FILE_AMOUNT)) {
                 flushFiles(messages, currentFiles);
                 currentBytes = 0;
             }
