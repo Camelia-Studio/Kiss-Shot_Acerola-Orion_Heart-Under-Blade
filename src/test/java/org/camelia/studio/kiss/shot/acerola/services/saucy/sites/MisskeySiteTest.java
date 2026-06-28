@@ -1,0 +1,220 @@
+package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
+
+import net.dv8tion.jda.api.entities.MessageEmbed;
+import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
+import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyMatch;
+import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyProcessResponse;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class MisskeySiteTest {
+    @Test
+    void matchesConfiguredMisskeyDomainsAndRespectsRemainingSlots() {
+        MisskeySite site = new MisskeySite(new FakeMisskeyGateway(), config(List.of(
+                "misskey.io",
+                "misskey.design",
+                "oekakiskey.com"
+        )));
+        String content = """
+                https://misskey.io/notes/abc123
+                https://www.misskey.design/notes/def456?with=query
+                https://oekakiskey.com/notes/999aaa
+                https://unknown.example/notes/nope
+                """;
+
+        List<SaucyMatch> limitedMatches = site.match(content, 2);
+        List<SaucyMatch> allMatches = site.match(content, 10);
+
+        assertEquals(2, limitedMatches.size());
+        assertEquals(3, allMatches.size());
+        assertEquals("misskey", allMatches.getFirst().siteId());
+        assertEquals("abc123", allMatches.getFirst().groups().get("id"));
+        assertEquals("https://misskey.io", allMatches.getFirst().groups().get("baseUrl"));
+        assertEquals("def456", allMatches.get(1).groups().get("id"));
+        assertEquals("https://misskey.design", allMatches.get(1).groups().get("baseUrl"));
+        assertEquals("999aaa", allMatches.get(2).groups().get("id"));
+        assertEquals("https://oekakiskey.com", allMatches.get(2).groups().get("baseUrl"));
+    }
+
+    @Test
+    void ignoresUnknownDomainsAndInvalidNoteIds() {
+        MisskeySite site = new MisskeySite(new FakeMisskeyGateway(), config(List.of("misskey.io")));
+        String content = """
+                https://example.com/notes/abc123
+                https://misskey.io/notes/ABC123
+                https://misskey.io/notes/abc123/extra
+                """;
+
+        List<SaucyMatch> matches = site.match(content, 10);
+
+        assertEquals(0, matches.size());
+    }
+
+    @Test
+    void createsEmbedPerImageWithoutUploadingFiles() {
+        FakeMisskeyGateway gateway = new FakeMisskeyGateway();
+        gateway.note(note("abc123", "Bonjour Misskey", List.of(
+                file("1", "image/png", false, "https://cdn.example/one.png", "https://cdn.example/one-thumb.png"),
+                file("2", "image/jpeg", false, "", "https://cdn.example/two-thumb.jpg"),
+                file("3", "video/mp4", false, "https://cdn.example/video.mp4", "https://cdn.example/video-thumb.jpg")
+        )));
+        MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
+
+        SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();
+
+        assertNull(response.text());
+        assertTrue(response.files().isEmpty());
+        assertFalse(response.sensitive());
+        assertEquals(2, response.embeds().size());
+        MessageEmbed first = response.embeds().getFirst();
+        MessageEmbed second = response.embeds().get(1);
+        assertEquals(0x85B300, first.getColorRaw());
+        assertEquals("https://misskey.io/notes/abc123", first.getUrl());
+        assertEquals("Alice (@alice)", first.getAuthor().getName());
+        assertEquals("https://misskey.io/notes/abc123", first.getAuthor().getUrl());
+        assertEquals("https://cdn.example/avatar.png", first.getAuthor().getIconUrl());
+        assertEquals("Bonjour Misskey", first.getDescription());
+        assertEquals("https://cdn.example/one.png", first.getImage().getUrl());
+        assertEquals("https://cdn.example/two-thumb.jpg", second.getImage().getUrl());
+        assertEquals("Misskey", first.getFooter().getText());
+        assertEquals(OffsetDateTime.parse("2025-01-01T00:00:00Z"), first.getTimestamp());
+    }
+
+    @Test
+    void createsTextEmbedWhenThereAreNoImagesAndKeepsSensitiveFlagFromIgnoredFiles() {
+        FakeMisskeyGateway gateway = new FakeMisskeyGateway();
+        gateway.note(note("abc123", "Texte seul", List.of(
+                file("1", "video/mp4", true, "https://cdn.example/video.mp4", "https://cdn.example/video-thumb.jpg")
+        )));
+        MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
+
+        SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();
+
+        assertTrue(response.sensitive());
+        assertTrue(response.files().isEmpty());
+        assertEquals(1, response.embeds().size());
+        assertEquals("Texte seul", response.embeds().getFirst().getDescription());
+        assertNull(response.embeds().getFirst().getImage());
+    }
+
+    @Test
+    void fallsBackToTextEmbedWhenAllImageUrlsAreInvalid() {
+        FakeMisskeyGateway gateway = new FakeMisskeyGateway();
+        gateway.note(note("abc123", "Images invalides", List.of(
+                file("1", "image/png", false, "", ""),
+                file("2", "image/jpeg", false, "file:///tmp/local.jpg", "ftp://cdn.example/thumb.jpg")
+        )));
+        MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
+
+        SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();
+
+        assertEquals(1, response.embeds().size());
+        assertEquals("Images invalides", response.embeds().getFirst().getDescription());
+        assertNull(response.embeds().getFirst().getImage());
+    }
+
+    @Test
+    void truncatesLongDescriptionsToDiscordLimit() {
+        FakeMisskeyGateway gateway = new FakeMisskeyGateway();
+        gateway.note(note("abc123", "x".repeat(5_000), List.of()));
+        MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
+
+        SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();
+
+        String description = response.embeds().getFirst().getDescription();
+        assertEquals(4_096, description.length());
+        assertTrue(description.endsWith("..."));
+    }
+
+    @Test
+    void returnsEmptyWhenClientHasNoUsableNoteOrThrows() {
+        FakeMisskeyGateway emptyGateway = new FakeMisskeyGateway();
+        MisskeySite emptySite = new MisskeySite(emptyGateway, config(List.of("misskey.io")));
+        FakeMisskeyGateway throwingGateway = new FakeMisskeyGateway();
+        throwingGateway.throwOnGet();
+        MisskeySite throwingSite = new MisskeySite(throwingGateway, config(List.of("misskey.io")));
+
+        Optional<SaucyProcessResponse> emptyResponse = emptySite.process(match("https://misskey.io", "abc123")).join();
+        Optional<SaucyProcessResponse> throwingResponse = throwingSite.process(match("https://misskey.io", "abc123")).join();
+
+        assertTrue(emptyResponse.isEmpty());
+        assertTrue(throwingResponse.isEmpty());
+    }
+
+    private static SaucyMatch match(String baseUrl, String id) {
+        return new SaucyMatch("misskey", baseUrl + "/notes/" + id, Map.of(
+                "baseUrl", baseUrl,
+                "id", id
+        ));
+    }
+
+    private static MisskeyNote note(String id, String text, List<MisskeyFile> files) {
+        return new MisskeyNote(
+                id,
+                Instant.parse("2025-01-01T00:00:00Z").toString(),
+                text,
+                "public",
+                files,
+                new MisskeyUser("u1", "Alice", "alice", "https://cdn.example/avatar.png")
+        );
+    }
+
+    private static MisskeyFile file(
+            String id,
+            String type,
+            boolean sensitive,
+            String url,
+            String thumbnailUrl
+    ) {
+        return new MisskeyFile(id, type, 1234, sensitive, url, thumbnailUrl);
+    }
+
+    private static SaucyLinkEmbedConfig config(List<String> misskeyDomains) {
+        return new SaucyLinkEmbedConfig(
+                true,
+                3600,
+                8,
+                4,
+                10_485_760L,
+                true,
+                "Traitement du lien en cours...",
+                "",
+                5,
+                "mp4",
+                2000,
+                misskeyDomains
+        );
+    }
+
+    private static final class FakeMisskeyGateway implements MisskeyGateway {
+        private MisskeyNote note;
+        private boolean throwOnGet;
+
+        private void note(MisskeyNote note) {
+            this.note = note;
+        }
+
+        private void throwOnGet() {
+            throwOnGet = true;
+        }
+
+        @Override
+        public Optional<MisskeyNote> getNote(String baseUrl, String id) {
+            if (throwOnGet) {
+                throw new IllegalStateException("boom");
+            }
+
+            return Optional.ofNullable(note);
+        }
+    }
+}
