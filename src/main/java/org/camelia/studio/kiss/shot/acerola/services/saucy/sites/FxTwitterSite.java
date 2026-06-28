@@ -2,7 +2,6 @@ package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyFileAttachment;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkCache;
@@ -18,7 +17,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -118,12 +116,10 @@ public class FxTwitterSite implements SaucySite {
             List<String> originalPhotoUrls = photoUrls.stream()
                     .map(FxTwitterSite::originalPhotoUrl)
                     .toList();
-            List<SaucyFileAttachment> files = photoAttachments(originalPhotoUrls, id);
-            String fallbackImageUrl = files.isEmpty() ? originalPhotoUrls.getFirst() : null;
             return Optional.of(new SaucyProcessResponse(
                     null,
-                    List.of(embed(tweet, fallbackImageUrl)),
-                    files,
+                    photoEmbeds(tweet, originalPhotoUrls),
+                    List.of(),
                     sensitive(tweet)
             ));
         }
@@ -136,30 +132,6 @@ public class FxTwitterSite implements SaucySite {
         ));
     }
 
-    private List<SaucyFileAttachment> photoAttachments(List<String> urls, String id) {
-        List<SaucyFileAttachment> files = new ArrayList<>();
-        for (int index = 0; index < urls.size() && files.size() < Message.MAX_FILE_AMOUNT; index++) {
-            String url = urls.get(index);
-            long contentLength = gateway.contentLength(url);
-            if (contentLength > config.maxFileBytes()) {
-                continue;
-            }
-
-            byte[] bytes = gateway.download(url, config.maxFileBytes());
-            if (bytes.length == 0 || bytes.length > config.maxFileBytes()) {
-                continue;
-            }
-
-            files.add(new SaucyFileAttachment(
-                    fileName(url, "tweet-" + id + "-" + (index + 1)),
-                    bytes,
-                    imageContentType(url)
-            ));
-        }
-
-        return List.copyOf(files);
-    }
-
     private static SaucyProcessResponse fallback(FxTwitterTweet tweet, String id, String user) {
         return new SaucyProcessResponse(
                 "https://fxtwitter.com/%s/status/%s".formatted(screenName(tweet, user), id),
@@ -169,10 +141,36 @@ public class FxTwitterSite implements SaucySite {
         );
     }
 
+    private static List<MessageEmbed> photoEmbeds(FxTwitterTweet tweet, List<String> urls) {
+        List<MessageEmbed> embeds = new ArrayList<>();
+        for (int index = 0; index < urls.size(); index++) {
+            embeds.add(embed(tweet, urls.get(index), index == 0));
+        }
+
+        return List.copyOf(embeds);
+    }
+
     private static MessageEmbed embed(FxTwitterTweet tweet, String imageUrl) {
+        return embed(tweet, imageUrl, true);
+    }
+
+    private static MessageEmbed embed(FxTwitterTweet tweet, String imageUrl, boolean includeMetadata) {
         EmbedBuilder builder = new EmbedBuilder()
-                .setColor(TWITTER_BLUE)
-                .setDescription(description(tweet))
+                .setColor(TWITTER_BLUE);
+
+        if (isHttpUrl(tweet.url())) {
+            builder.setUrl(tweet.url());
+        }
+
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            builder.setImage(imageUrl);
+        }
+
+        if (!includeMetadata) {
+            return builder.build();
+        }
+
+        builder.setDescription(description(tweet))
                 .setFooter("Twitter")
                 .addField("Replies", String.valueOf(number(tweet.replies())), true)
                 .addField("Retweets", String.valueOf(number(tweet.retweets())), true)
@@ -188,10 +186,6 @@ public class FxTwitterSite implements SaucySite {
 
         if (tweet.createdTimestamp() != null) {
             builder.setTimestamp(Instant.ofEpochSecond(tweet.createdTimestamp()));
-        }
-
-        if (imageUrl != null && !imageUrl.isBlank()) {
-            builder.setImage(imageUrl);
         }
 
         return builder.build();
@@ -276,33 +270,6 @@ public class FxTwitterSite implements SaucySite {
         }
 
         return "video/mp4";
-    }
-
-    private static String imageContentType(String url) {
-        String path = "";
-        try {
-            path = Optional.ofNullable(new URI(url).getPath()).orElse("");
-        } catch (IllegalArgumentException | URISyntaxException ignored) {
-        }
-
-        String normalized = path.toLowerCase(Locale.ROOT);
-        if (normalized.endsWith(".png")) {
-            return "image/png";
-        }
-        if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg")) {
-            return "image/jpeg";
-        }
-        if (normalized.endsWith(".gif")) {
-            return "image/gif";
-        }
-        if (normalized.endsWith(".webp")) {
-            return "image/webp";
-        }
-        if (normalized.endsWith(".avif")) {
-            return "image/avif";
-        }
-
-        return "application/octet-stream";
     }
 
     private static String authorUrl(FxTwitterAuthor author) {

@@ -3,9 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkCache;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,10 +14,6 @@ import java.util.Optional;
 
 interface MisskeyGateway {
     Optional<MisskeyNote> getNote(String baseUrl, String id);
-
-    long contentLength(String url);
-
-    byte[] download(String url, long maxBytes);
 }
 
 public class MisskeyClient implements MisskeyGateway {
@@ -66,71 +60,6 @@ public class MisskeyClient implements MisskeyGateway {
         }
 
         return note;
-    }
-
-    @Override
-    public long contentLength(String url) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(REQUEST_TIMEOUT)
-                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                    .build();
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return 0L;
-            }
-
-            return response.headers().firstValueAsLong("content-length").orElse(0L);
-        } catch (IllegalArgumentException | IOException ignored) {
-            return 0L;
-        } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-            return 0L;
-        }
-    }
-
-    @Override
-    public byte[] download(String url, long maxBytes) {
-        if (maxBytes <= 0) {
-            return new byte[0];
-        }
-
-        try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(REQUEST_TIMEOUT)
-                    .GET()
-                    .build();
-            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return new byte[0];
-            }
-
-            try (InputStream stream = response.body()) {
-                return readCapped(stream, maxBytes);
-            }
-        } catch (IllegalArgumentException | IOException ignored) {
-            return new byte[0];
-        } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-            return new byte[0];
-        }
-    }
-
-    private static byte[] readCapped(InputStream stream, long maxBytes) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        byte[] buffer = new byte[8192];
-        long total = 0L;
-        int read;
-        while ((read = stream.read(buffer)) != -1) {
-            total += read;
-            if (total > maxBytes) {
-                return new byte[0];
-            }
-
-            output.write(buffer, 0, read);
-        }
-
-        return output.toByteArray();
     }
 
     private Optional<MisskeyNote> parseUsableNote(String json) {

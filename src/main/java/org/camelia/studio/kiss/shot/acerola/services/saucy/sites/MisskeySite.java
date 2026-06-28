@@ -2,9 +2,7 @@ package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
-import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyFileAttachment;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkCache;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyMatch;
@@ -33,12 +31,10 @@ public class MisskeySite implements SaucySite {
     private static final String DESCRIPTION_TRUNCATION_SUFFIX = "...";
 
     private final MisskeyGateway gateway;
-    private final SaucyLinkEmbedConfig config;
     private final Pattern urlPattern;
 
     MisskeySite(MisskeyGateway gateway, SaucyLinkEmbedConfig config) {
         this.gateway = gateway;
-        this.config = config;
         this.urlPattern = urlPattern(config.misskeyDomains());
     }
 
@@ -96,41 +92,55 @@ public class MisskeySite implements SaucySite {
 
         List<MisskeyFile> files = files(note.get());
         boolean sensitive = files.stream().anyMatch(MisskeyFile::isSensitive);
-        List<MisskeyImageCandidate> images = files.stream()
+        List<String> imageUrls = files.stream()
                 .filter(MisskeySite::isImageFile)
-                .map(file -> imageUrl(file).map(url -> new MisskeyImageCandidate(file, url)))
+                .map(MisskeySite::imageUrl)
                 .flatMap(Optional::stream)
                 .toList();
-        if (images.isEmpty()) {
+        if (imageUrls.isEmpty()) {
             return Optional.empty();
         }
 
-        List<SaucyFileAttachment> imageFiles = new ArrayList<>();
-        for (int index = 0; index < images.size() && imageFiles.size() < Message.MAX_FILE_AMOUNT; index++) {
-            attachment(images.get(index), id, index).ifPresent(imageFiles::add);
-        }
-
-        String fallbackImageUrl = imageFiles.isEmpty() ? images.getFirst().url() : null;
         return Optional.of(new SaucyProcessResponse(
                 null,
-                List.of(embed(note.get(), baseUrl, id, fallbackImageUrl)),
-                imageFiles,
+                embeds(note.get(), baseUrl, id, imageUrls),
+                List.of(),
                 sensitive
         ));
+    }
+
+    private static List<MessageEmbed> embeds(
+            MisskeyNote note,
+            String baseUrl,
+            String id,
+            List<String> imageUrls
+    ) {
+        List<MessageEmbed> embeds = new ArrayList<>();
+        for (int index = 0; index < imageUrls.size(); index++) {
+            embeds.add(embed(note, baseUrl, id, imageUrls.get(index), index == 0));
+        }
+
+        return List.copyOf(embeds);
     }
 
     private static MessageEmbed embed(
             MisskeyNote note,
             String baseUrl,
             String id,
-            String imageUrl
+            String imageUrl,
+            boolean includeMetadata
     ) {
         String noteUrl = baseUrl + "/notes/" + id;
         EmbedBuilder builder = new EmbedBuilder()
                 .setColor(MISSKEY_GREEN)
-                .setFooter("Misskey");
+                .setUrl(noteUrl)
+                .setImage(imageUrl);
 
-        builder.setTitle("Misskey", noteUrl);
+        if (!includeMetadata) {
+            return builder.build();
+        }
+
+        builder.setFooter("Misskey");
 
         String description = description(note);
         if (!description.isBlank()) {
@@ -144,30 +154,7 @@ public class MisskeySite implements SaucySite {
 
         parseTimestamp(note.createdAt()).ifPresent(builder::setTimestamp);
 
-        if (imageUrl != null) {
-            builder.setImage(imageUrl);
-        }
-
         return builder.build();
-    }
-
-    private Optional<SaucyFileAttachment> attachment(MisskeyImageCandidate image, String noteId, int index) {
-        String url = image.url();
-        long contentLength = gateway.contentLength(url);
-        if (contentLength > config.maxFileBytes()) {
-            return Optional.empty();
-        }
-
-        byte[] bytes = gateway.download(url, config.maxFileBytes());
-        if (bytes.length == 0 || bytes.length > config.maxFileBytes()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(new SaucyFileAttachment(
-                fileName(url, "misskey-" + noteId + "-" + (index + 1)),
-                bytes,
-                contentType(image.file(), url)
-        ));
     }
 
     private static String authorName(MisskeyUser user) {
@@ -230,58 +217,6 @@ public class MisskeySite implements SaucySite {
 
     private static String validHttpUrlOrNull(String url) {
         return isHttpUrl(url) ? url : null;
-    }
-
-    private static String fileName(String url, String fallback) {
-        try {
-            String path = new URI(url).getPath();
-            if (path != null) {
-                int slash = path.lastIndexOf('/');
-                String name = slash >= 0 ? path.substring(slash + 1) : path;
-                if (!name.isBlank()) {
-                    return name;
-                }
-            }
-        } catch (IllegalArgumentException | URISyntaxException ignored) {
-        }
-
-        return fallback;
-    }
-
-    private static String contentType(MisskeyFile file, String url) {
-        String type = normalize(file.type());
-        if (type != null && type.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            return type;
-        }
-
-        return imageContentType(url);
-    }
-
-    private static String imageContentType(String url) {
-        String path = "";
-        try {
-            path = Optional.ofNullable(new URI(url).getPath()).orElse("");
-        } catch (IllegalArgumentException | URISyntaxException ignored) {
-        }
-
-        String normalized = path.toLowerCase(Locale.ROOT);
-        if (normalized.endsWith(".png")) {
-            return "image/png";
-        }
-        if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg")) {
-            return "image/jpeg";
-        }
-        if (normalized.endsWith(".gif")) {
-            return "image/gif";
-        }
-        if (normalized.endsWith(".webp")) {
-            return "image/webp";
-        }
-        if (normalized.endsWith(".avif")) {
-            return "image/avif";
-        }
-
-        return "application/octet-stream";
     }
 
     private static boolean isHttpUrl(String url) {
@@ -348,8 +283,5 @@ public class MisskeySite implements SaucySite {
         }
 
         return value.trim();
-    }
-
-    private record MisskeyImageCandidate(MisskeyFile file, String url) {
     }
 }

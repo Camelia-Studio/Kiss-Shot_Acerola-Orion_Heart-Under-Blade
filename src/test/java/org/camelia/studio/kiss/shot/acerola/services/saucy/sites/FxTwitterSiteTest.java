@@ -14,6 +14,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FxTwitterSiteTest {
@@ -172,28 +173,25 @@ class FxTwitterSiteTest {
     }
 
     @Test
-    void createsSingleEmbedWithPhotoAttachments() {
+    void createsGroupedImageEmbedsForPhotos() {
         FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
         List<FxTwitterPhoto> photos = List.of(
                 new FxTwitterPhoto("photo", "https://pbs.twimg.com/media/one.jpg?format=jpg&name=small", 800, 600),
                 new FxTwitterPhoto("photo", "https://pbs.twimg.com/media/two.jpg", 800, 600)
         );
-        gateway.download("https://pbs.twimg.com/media/one.jpg?format=jpg&name=orig", new byte[]{1});
-        gateway.download("https://pbs.twimg.com/media/two.jpg?name=orig", new byte[]{2});
         gateway.response(tweet("123", "Photo tweet", false, photos, List.of(), null));
         FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
 
         SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
 
-        assertEquals(1, response.embeds().size());
-        assertEquals(2, response.files().size());
-        assertEquals(null, response.embeds().getFirst().getImage());
-        assertEquals("one.jpg", response.files().getFirst().fileName());
-        assertEquals("image/jpeg", response.files().getFirst().contentType());
-        assertArrayEquals(new byte[]{1}, response.files().getFirst().data());
-        assertEquals("two.jpg", response.files().get(1).fileName());
-        assertEquals("image/jpeg", response.files().get(1).contentType());
-        assertArrayEquals(new byte[]{2}, response.files().get(1).data());
+        assertEquals(2, response.embeds().size());
+        assertTrue(response.files().isEmpty());
+        assertEquals("https://twitter.com/alice/status/123", response.embeds().getFirst().getUrl());
+        assertEquals("Photo tweet", response.embeds().getFirst().getDescription());
+        assertTrue(response.embeds().getFirst().getImage().getUrl().contains("name=orig"));
+        assertEquals("https://twitter.com/alice/status/123", response.embeds().get(1).getUrl());
+        assertNull(response.embeds().get(1).getDescription());
+        assertTrue(response.embeds().get(1).getImage().getUrl().contains("name=orig"));
     }
 
     @Test
@@ -204,16 +202,14 @@ class FxTwitterSiteTest {
                 new FxTwitterPhoto("photo", "ftp://pbs.twimg.com/media/invalid.jpg", 800, 600),
                 new FxTwitterPhoto("photo", "https://pbs.twimg.com/media/valid.jpg", 800, 600)
         );
-        gateway.download("https://pbs.twimg.com/media/valid.jpg?name=orig", new byte[]{1});
         gateway.response(tweet("123", "Photo tweet", false, photos, List.of(), null));
         FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
 
         SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
 
         assertEquals(1, response.embeds().size());
-        assertEquals(null, response.embeds().getFirst().getImage());
-        assertEquals(1, response.files().size());
-        assertEquals("valid.jpg", response.files().getFirst().fileName());
+        assertTrue(response.files().isEmpty());
+        assertEquals("https://pbs.twimg.com/media/valid.jpg?name=orig", response.embeds().getFirst().getImage().getUrl());
     }
 
     @Test
