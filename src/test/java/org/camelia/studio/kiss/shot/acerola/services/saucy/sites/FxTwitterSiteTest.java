@@ -118,6 +118,37 @@ class FxTwitterSiteTest {
     }
 
     @Test
+    void fallsBackWhenVideoDownloadFails() {
+        FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
+        String videoUrl = "https://video.example/path/tweet-video.mp4";
+        gateway.response(tweet("123", "Video tweet", false, List.of(), List.of(video(videoUrl)), null));
+        gateway.length(videoUrl, 512);
+        FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
+
+        SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
+
+        assertEquals("https://fxtwitter.com/alice/status/123", response.text());
+        assertTrue(response.embeds().isEmpty());
+        assertTrue(response.files().isEmpty());
+    }
+
+    @Test
+    void fallsBackWhenDownloadedVideoExceedsLimit() {
+        FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
+        String videoUrl = "https://video.example/path/tweet-video.mp4";
+        gateway.response(tweet("123", "Video tweet", false, List.of(), List.of(video(videoUrl)), null));
+        gateway.length(videoUrl, 0);
+        gateway.download(videoUrl, new byte[]{1, 2, 3, 4, 5});
+        FxTwitterSite site = new FxTwitterSite(gateway, config(4));
+
+        SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
+
+        assertEquals("https://fxtwitter.com/alice/status/123", response.text());
+        assertTrue(response.embeds().isEmpty());
+        assertTrue(response.files().isEmpty());
+    }
+
+    @Test
     void uploadsVideoWhenSmallEnough() {
         FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
         String videoUrl = "https://video.example/path/tweet-video.mp4";

@@ -86,15 +86,14 @@ public class FxTwitterSite implements SaucySite {
         if (video != null && video.url() != null && !video.url().isBlank()) {
             long contentLength = gateway.contentLength(video.url());
             if (contentLength > config.maxFileBytes()) {
-                return Optional.of(new SaucyProcessResponse(
-                        "https://fxtwitter.com/%s/status/%s".formatted(screenName(tweet, user), id),
-                        List.of(),
-                        List.of(),
-                        sensitive(tweet)
-                ));
+                return Optional.of(fallback(tweet, id, user));
             }
 
             byte[] bytes = gateway.download(video.url());
+            if (bytes.length == 0 || bytes.length > config.maxFileBytes()) {
+                return Optional.of(fallback(tweet, id, user));
+            }
+
             SaucyFileAttachment file = new SaucyFileAttachment(fileName(video.url(), id), bytes, contentType(video));
             return Optional.of(new SaucyProcessResponse(
                     null,
@@ -118,6 +117,15 @@ public class FxTwitterSite implements SaucySite {
                 List.of(),
                 sensitive(tweet)
         ));
+    }
+
+    private static SaucyProcessResponse fallback(FxTwitterTweet tweet, String id, String user) {
+        return new SaucyProcessResponse(
+                "https://fxtwitter.com/%s/status/%s".formatted(screenName(tweet, user), id),
+                List.of(),
+                List.of(),
+                sensitive(tweet)
+        );
     }
 
     private static MessageEmbed embed(FxTwitterTweet tweet, String imageUrl) {
