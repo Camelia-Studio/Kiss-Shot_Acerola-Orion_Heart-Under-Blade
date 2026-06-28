@@ -41,22 +41,38 @@ public class FxTwitterClient implements FxTwitterGateway {
         String normalizedTranslate = normalize(translate);
         String cacheKey = "fxtwitter:%s:%s:%s".formatted(user, id, normalizedTranslate == null ? "" : normalizedTranslate);
         String json = cache.getIfPresent(cacheKey);
+        boolean cacheHit = json != null;
         if (json == null) {
             json = fetchTweetJson(user, id, normalizedTranslate);
             if (json == null || json.isBlank()) {
                 return Optional.empty();
             }
-
-            cache.put(cacheKey, json);
         }
 
-        if (json == null || json.isBlank()) {
+        Optional<FxTwitterResponse> response = parseUsableResponse(json);
+        if (response.isEmpty()) {
+            if (cacheHit) {
+                cache.put(cacheKey, null);
+            }
+
             return Optional.empty();
         }
 
+        if (!cacheHit) {
+            cache.put(cacheKey, json);
+        }
+
+        return response;
+    }
+
+    private Optional<FxTwitterResponse> parseUsableResponse(String json) {
         try {
             FxTwitterResponse response = objectMapper.readValue(json, FxTwitterResponse.class);
-            return Optional.ofNullable(response);
+            if (response == null || response.tweet() == null) {
+                return Optional.empty();
+            }
+
+            return Optional.of(response);
         } catch (IOException ignored) {
             return Optional.empty();
         }
