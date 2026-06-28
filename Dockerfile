@@ -8,6 +8,7 @@ RUN mkdir -p /app
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
+    ffmpeg \
     libssl3 \
     libgcc-s1 \
     && rm -rf /var/lib/apt/lists/*
