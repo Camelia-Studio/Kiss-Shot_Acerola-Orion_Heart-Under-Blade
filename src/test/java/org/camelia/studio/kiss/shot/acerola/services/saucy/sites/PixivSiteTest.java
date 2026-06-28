@@ -1,11 +1,16 @@
 package org.camelia.studio.kiss.shot.acerola.services.saucy.sites;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyFileAttachment;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyMatch;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyProcessResponse;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -251,6 +256,35 @@ class PixivSiteTest {
     }
 
     @Test
+    void ugoiraFallsBackToSmallerZipWhenOriginalExceedsMaxFileSize() {
+        FakePixivGateway gateway = new FakePixivGateway();
+        FakeUgoiraRenderer renderer = new FakeUgoiraRenderer();
+        byte[] renderedBytes = new byte[]{4, 5, 6};
+        String originalSrc = "https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip";
+        String fallbackSrc = "https://i.pximg.net/img-zip-ugoira/106848609_ugoira600x600.zip";
+        gateway.details(illustration("106848609", 2, 1, 0, urls(imageUrl(0, "jpg"), "", "", "")));
+        gateway.ugoiraMetadata(ugoiraMetadata(originalSrc, fallbackSrc));
+        gateway.download(originalSrc, new byte[]{1, 2, 3, 4});
+        gateway.download(fallbackSrc, new byte[]{8, 9});
+        renderer.renderedBytes(renderedBytes);
+        PixivSite site = new PixivSite(gateway, config("session", 3, 5), renderer);
+        CapturedLogs logs = capturePixivSiteLogs(Level.INFO);
+
+        try {
+            SaucyProcessResponse response = site.process(match("106848609")).join().orElseThrow();
+
+            assertEquals(List.of(originalSrc, fallbackSrc), gateway.downloadUrls);
+            assertArrayEquals(new byte[]{8, 9}, renderer.lastZipBytes);
+            assertEquals(1, response.files().size());
+            assertArrayEquals(renderedBytes, response.files().getFirst().data());
+            assertTrue(logs.contains(Level.INFO, "Skipping Pixiv ugoira candidate"));
+            assertTrue(logs.contains(Level.INFO, "downloaded zip exceeds max file size"));
+        } finally {
+            logs.close();
+        }
+    }
+
+    @Test
     void ugoiraRendererOutputOverMaxFileSizeReturnsEmpty() {
         FakePixivGateway gateway = new FakePixivGateway();
         FakeUgoiraRenderer renderer = new FakeUgoiraRenderer();
@@ -382,6 +416,31 @@ class PixivSiteTest {
         );
     }
 
+    private static CapturedLogs capturePixivSiteLogs(Level level) {
+        Logger logger = (Logger) LoggerFactory.getLogger(PixivSite.class);
+        Level previousLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.setLevel(level);
+        logger.addAppender(appender);
+        return new CapturedLogs(logger, previousLevel, appender);
+    }
+
+    private record CapturedLogs(Logger logger, Level previousLevel, ListAppender<ILoggingEvent> appender)
+            implements AutoCloseable {
+        private boolean contains(Level level, String message) {
+            return appender.list.stream().anyMatch(event ->
+                    event.getLevel() == level && event.getFormattedMessage().contains(message)
+            );
+        }
+
+        @Override
+        public void close() {
+            logger.detachAppender(appender);
+            logger.setLevel(previousLevel);
+        }
+    }
+
     private static final class FakePixivGateway implements PixivGateway {
         private final boolean hasSessionCookie;
         private PixivIllustrationResponse details;
@@ -389,6 +448,7 @@ class PixivSiteTest {
         private final List<PixivPage> pages = new java.util.ArrayList<>();
         private final Map<String, Long> lengths = new HashMap<>();
         private final Map<String, byte[]> downloads = new HashMap<>();
+        private final List<String> downloadUrls = new java.util.ArrayList<>();
         private int detailsRequests;
         private int pagesRequests;
         private int downloadRequests;
@@ -451,6 +511,7 @@ class PixivSiteTest {
         @Override
         public Optional<byte[]> download(String url, long maxBytes) {
             downloadRequests++;
+            downloadUrls.add(url);
             return Optional.ofNullable(downloads.get(url));
         }
     }

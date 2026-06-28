@@ -7,6 +7,8 @@ import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyMatch;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyProcessResponse;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucySite;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -16,12 +18,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class PixivSite implements SaucySite {
+    private static final Logger logger = LoggerFactory.getLogger(PixivSite.class);
     private static final String ID = "pixiv";
     private static final int SENSITIVE_SAFETY_LEVEL = 6;
     private static final Pattern URL_PATTERN = Pattern.compile(
@@ -135,41 +139,65 @@ public class PixivSite implements SaucySite {
         }
 
         PixivUgoiraMetadata metadata = metadataResponse.get().body();
-        String zipUrl = firstValidHttpUrl(metadata.originalSrc(), metadata.src());
-        if (zipUrl == null) {
-            return Optional.empty();
-        }
-
-        Optional<byte[]> zipBytes = gateway.download(zipUrl, config.maxFileBytes());
-        if (zipBytes.isEmpty() || zipBytes.get().length == 0 || zipBytes.get().length > config.maxFileBytes()) {
+        List<String> zipUrls = ugoiraZipUrls(metadata);
+        if (zipUrls.isEmpty()) {
+            logger.info("Ignoring Pixiv ugoira {}: no usable zip URL", id);
             return Optional.empty();
         }
 
         String format = safeFormat(config.pixivUgoiraFormat());
-        Optional<byte[]> renderedBytes = ugoiraRenderer.render(
-                zipBytes.get(),
-                metadata,
-                format,
-                config.pixivUgoiraBitrate(),
-                config.maxFileBytes()
-        );
-        if (renderedBytes.isEmpty()
-                || renderedBytes.get().length == 0
-                || renderedBytes.get().length > config.maxFileBytes()) {
-            return Optional.empty();
+        for (String zipUrl : zipUrls) {
+            Optional<byte[]> zipBytes = gateway.download(zipUrl, config.maxFileBytes());
+            if (zipBytes.isEmpty() || zipBytes.get().length == 0) {
+                logger.info("Skipping Pixiv ugoira candidate {}: zip download failed or was empty", zipUrl);
+                continue;
+            }
+            if (zipBytes.get().length > config.maxFileBytes()) {
+                logger.info(
+                        "Skipping Pixiv ugoira candidate {}: downloaded zip exceeds max file size ({} > {})",
+                        zipUrl,
+                        zipBytes.get().length,
+                        config.maxFileBytes()
+                );
+                continue;
+            }
+
+            Optional<byte[]> renderedBytes = ugoiraRenderer.render(
+                    zipBytes.get(),
+                    metadata,
+                    format,
+                    config.pixivUgoiraBitrate(),
+                    config.maxFileBytes()
+            );
+            if (renderedBytes.isEmpty() || renderedBytes.get().length == 0) {
+                logger.info("Skipping Pixiv ugoira candidate {}: rendered video was empty", zipUrl);
+                continue;
+            }
+            if (renderedBytes.get().length > config.maxFileBytes()) {
+                logger.info(
+                        "Skipping Pixiv ugoira candidate {}: rendered video exceeds max file size ({} > {})",
+                        zipUrl,
+                        renderedBytes.get().length,
+                        config.maxFileBytes()
+                );
+                continue;
+            }
+
+            SaucyFileAttachment file = new SaucyFileAttachment(
+                    ugoiraFileName(illustration.title(), id, format),
+                    renderedBytes.get(),
+                    videoContentType(format)
+            );
+            return Optional.of(new SaucyProcessResponse(
+                    null,
+                    List.of(),
+                    List.of(file),
+                    isSensitive(illustration)
+            ));
         }
 
-        SaucyFileAttachment file = new SaucyFileAttachment(
-                ugoiraFileName(illustration.title(), id, format),
-                renderedBytes.get(),
-                videoContentType(format)
-        );
-        return Optional.of(new SaucyProcessResponse(
-                null,
-                List.of(),
-                List.of(file),
-                isSensitive(illustration)
-        ));
+        logger.info("Ignoring Pixiv ugoira {}: no candidate produced a usable video", id);
+        return Optional.empty();
     }
 
     private static boolean isSensitive(PixivIllustration illustration) {
@@ -293,15 +321,12 @@ public class PixivSite implements SaucySite {
         return isHttpUrl(url) ? url : null;
     }
 
-    private static String firstValidHttpUrl(String... urls) {
-        for (String url : urls) {
-            String validUrl = validHttpUrlOrNull(url);
-            if (validUrl != null) {
-                return validUrl;
-            }
-        }
-
-        return null;
+    private static List<String> ugoiraZipUrls(PixivUgoiraMetadata metadata) {
+        return candidateUrls(metadata.originalSrc(), metadata.src()).stream()
+                .map(PixivSite::validHttpUrlOrNull)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     private static boolean isHttpUrl(String url) {
