@@ -44,6 +44,37 @@ class FxTwitterSiteTest {
     }
 
     @Test
+    void ignoresPhotoAndVideoSuffixesWhenMatching() {
+        FxTwitterSite site = new FxTwitterSite(new FakeFxTwitterGateway(), config(1024));
+        String content = """
+                https://twitter.com/alice/status/123/photo/1
+                https://x.com/bob/status/456/video/1
+                """;
+
+        List<SaucyMatch> matches = site.match(content, 10);
+
+        assertEquals(2, matches.size());
+        assertEquals("alice", matches.get(0).groups().get("user"));
+        assertEquals("123", matches.get(0).groups().get("id"));
+        assertEquals("", matches.get(0).groups().get("translate"));
+        assertEquals("bob", matches.get(1).groups().get("user"));
+        assertEquals("456", matches.get(1).groups().get("id"));
+        assertEquals("", matches.get(1).groups().get("translate"));
+    }
+
+    @Test
+    void capturesTranslateAfterMediaSuffix() {
+        FxTwitterSite site = new FxTwitterSite(new FakeFxTwitterGateway(), config(1024));
+
+        List<SaucyMatch> matches = site.match("https://twitter.com/alice/status/123/photo/1/en", 10);
+
+        assertEquals(1, matches.size());
+        assertEquals("alice", matches.getFirst().groups().get("user"));
+        assertEquals("123", matches.getFirst().groups().get("id"));
+        assertEquals("en", matches.getFirst().groups().get("translate"));
+    }
+
+    @Test
     void createsEmbedForRegularTweet() {
         FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
         gateway.response(tweet("123", "Hello world", false, List.of(), List.of(), null));
