@@ -22,6 +22,8 @@ interface PixivGateway {
 
     Optional<PixivPagesResponse> illustrationPages(String id);
 
+    Optional<PixivUgoiraMetadataResponse> ugoiraMetadata(String id);
+
     long contentLength(String url);
 
     Optional<byte[]> download(String url, long maxBytes);
@@ -122,6 +124,39 @@ public class PixivClient implements PixivGateway {
     }
 
     @Override
+    public Optional<PixivUgoiraMetadataResponse> ugoiraMetadata(String id) {
+        String normalizedId = normalize(id);
+        if (normalizedId == null || !hasSessionCookie()) {
+            return Optional.empty();
+        }
+
+        String cacheKey = "pixiv:ugoira_meta:" + normalizedId;
+        String json = cache.getIfPresent(cacheKey);
+        boolean cacheHit = json != null;
+        if (json == null) {
+            json = fetchJson("https://www.pixiv.net/ajax/illust/" + encode(normalizedId) + "/ugoira_meta");
+            if (json == null || json.isBlank()) {
+                return Optional.empty();
+            }
+        }
+
+        Optional<PixivUgoiraMetadataResponse> response = parseUsableUgoiraMetadata(json);
+        if (response.isEmpty()) {
+            if (cacheHit) {
+                cache.put(cacheKey, null);
+            }
+
+            return Optional.empty();
+        }
+
+        if (!cacheHit) {
+            cache.put(cacheKey, json);
+        }
+
+        return response;
+    }
+
+    @Override
     public long contentLength(String url) {
         if (!hasSessionCookie()) {
             return 0L;
@@ -187,6 +222,19 @@ public class PixivClient implements PixivGateway {
     private Optional<PixivPagesResponse> parseUsablePages(String json) {
         try {
             PixivPagesResponse response = objectMapper.readValue(json, PixivPagesResponse.class);
+            if (response == null || response.error() || response.body() == null) {
+                return Optional.empty();
+            }
+
+            return Optional.of(response);
+        } catch (IOException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<PixivUgoiraMetadataResponse> parseUsableUgoiraMetadata(String json) {
+        try {
+            PixivUgoiraMetadataResponse response = objectMapper.readValue(json, PixivUgoiraMetadataResponse.class);
             if (response == null || response.error() || response.body() == null) {
                 return Optional.empty();
             }

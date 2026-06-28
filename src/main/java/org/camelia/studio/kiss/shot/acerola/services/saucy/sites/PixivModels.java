@@ -44,6 +44,30 @@ record PixivPagesResponse(
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+record PixivUgoiraMetadataResponse(
+        @JsonProperty("error") boolean error,
+        @JsonProperty("message") String message,
+        @JsonProperty("body") PixivUgoiraMetadata body
+) {
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+record PixivUgoiraMetadata(
+        @JsonProperty("originalSrc") String originalSrc,
+        @JsonProperty("src") String src,
+        @JsonProperty("mime_type") String mime_type,
+        @JsonProperty("frames") List<PixivUgoiraFrame> frames
+) {
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+record PixivUgoiraFrame(
+        @JsonProperty("file") String file,
+        @JsonProperty("delay") int delay
+) {
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 record PixivPage(
         @JsonProperty("urls") PixivPageUrls urls,
         @JsonProperty("width") int width,

@@ -30,14 +30,24 @@ public class PixivSite implements SaucySite {
 
     private final PixivGateway gateway;
     private final SaucyLinkEmbedConfig config;
+    private final PixivUgoiraRendererGateway ugoiraRenderer;
 
     PixivSite(PixivGateway gateway, SaucyLinkEmbedConfig config) {
+        this(gateway, config, new PixivUgoiraRenderer());
+    }
+
+    PixivSite(PixivGateway gateway, SaucyLinkEmbedConfig config, PixivUgoiraRendererGateway ugoiraRenderer) {
         this.gateway = gateway;
         this.config = config;
+        this.ugoiraRenderer = ugoiraRenderer;
     }
 
     public PixivSite(SaucyLinkEmbedConfig config, SaucyLinkCache<String> cache) {
-        this(new PixivClient(HttpClient.newHttpClient(), new ObjectMapper(), cache, config.pixivSessionCookie()), config);
+        this(
+                new PixivClient(HttpClient.newHttpClient(), new ObjectMapper(), cache, config.pixivSessionCookie()),
+                config,
+                new PixivUgoiraRenderer()
+        );
     }
 
     @Override
@@ -90,7 +100,7 @@ public class PixivSite implements SaucySite {
 
         PixivIllustration illustration = detailsResponse.get().body();
         if (illustration.illustType() == 2) {
-            return Optional.empty();
+            return ugoiraResponse(id, illustration);
         }
 
         int pageCount = Math.max(illustration.pageCount(), 1);
@@ -113,6 +123,49 @@ public class PixivSite implements SaucySite {
                 text,
                 List.of(),
                 files,
+                illustration.xRestrict() > 0
+        ));
+    }
+
+    private Optional<SaucyProcessResponse> ugoiraResponse(String id, PixivIllustration illustration) {
+        Optional<PixivUgoiraMetadataResponse> metadataResponse = gateway.ugoiraMetadata(id);
+        if (metadataResponse.isEmpty() || metadataResponse.get().error() || metadataResponse.get().body() == null) {
+            return Optional.empty();
+        }
+
+        PixivUgoiraMetadata metadata = metadataResponse.get().body();
+        String zipUrl = firstValidHttpUrl(metadata.originalSrc(), metadata.src());
+        if (zipUrl == null) {
+            return Optional.empty();
+        }
+
+        Optional<byte[]> zipBytes = gateway.download(zipUrl, config.maxFileBytes());
+        if (zipBytes.isEmpty() || zipBytes.get().length == 0 || zipBytes.get().length > config.maxFileBytes()) {
+            return Optional.empty();
+        }
+
+        String format = safeFormat(config.pixivUgoiraFormat());
+        Optional<byte[]> renderedBytes = ugoiraRenderer.render(
+                zipBytes.get(),
+                metadata,
+                format,
+                config.pixivUgoiraBitrate()
+        );
+        if (renderedBytes.isEmpty()
+                || renderedBytes.get().length == 0
+                || renderedBytes.get().length > config.maxFileBytes()) {
+            return Optional.empty();
+        }
+
+        SaucyFileAttachment file = new SaucyFileAttachment(
+                ugoiraFileName(illustration.title(), id, format),
+                renderedBytes.get(),
+                videoContentType(format)
+        );
+        return Optional.of(new SaucyProcessResponse(
+                null,
+                List.of(),
+                List.of(file),
                 illustration.xRestrict() > 0
         ));
     }
@@ -218,8 +271,31 @@ public class PixivSite implements SaucySite {
         return "application/octet-stream";
     }
 
+    private static String videoContentType(String format) {
+        String normalized = format.toLowerCase(Locale.ROOT);
+        if ("mp4".equals(normalized)) {
+            return "video/mp4";
+        }
+        if ("webm".equals(normalized)) {
+            return "video/webm";
+        }
+
+        return "application/octet-stream";
+    }
+
     private static String validHttpUrlOrNull(String url) {
         return isHttpUrl(url) ? url : null;
+    }
+
+    private static String firstValidHttpUrl(String... urls) {
+        for (String url : urls) {
+            String validUrl = validHttpUrlOrNull(url);
+            if (validUrl != null) {
+                return validUrl;
+            }
+        }
+
+        return null;
     }
 
     private static boolean isHttpUrl(String url) {
@@ -243,6 +319,35 @@ public class PixivSite implements SaucySite {
         }
 
         return value.trim();
+    }
+
+    private static String safeFormat(String format) {
+        String normalized = normalize(format);
+        if (normalized == null) {
+            return "mp4";
+        }
+
+        String safe = normalized.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+        return safe.isBlank() ? "mp4" : safe;
+    }
+
+    private static String ugoiraFileName(String title, String id, String format) {
+        String baseName = normalize(title);
+        if (baseName == null) {
+            baseName = "pixiv-" + id;
+        }
+
+        baseName = baseName
+                .replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]+", "_")
+                .replaceAll("\\s+", "_")
+                .replaceAll("_+", "_")
+                .replaceAll("^\\.+", "")
+                .replaceAll("\\.+$", "");
+        if (baseName.isBlank()) {
+            baseName = "pixiv-" + id;
+        }
+
+        return baseName + "_ugoira." + safeFormat(format);
     }
 
     private static List<String> candidateUrls(String... urls) {

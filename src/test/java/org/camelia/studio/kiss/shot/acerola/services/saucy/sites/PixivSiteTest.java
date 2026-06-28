@@ -189,14 +189,81 @@ class PixivSiteTest {
     }
 
     @Test
-    void returnsEmptyForUgoiraUntilTaskSeven() {
+    void ugoiraIllustrationCallsRenderer() {
         FakePixivGateway gateway = new FakePixivGateway();
+        FakeUgoiraRenderer renderer = new FakeUgoiraRenderer();
+        byte[] zipBytes = new byte[]{1, 2, 3};
+        byte[] renderedBytes = new byte[]{4, 5, 6};
+        String originalSrc = "https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip";
         gateway.details(illustration("106848609", 2, 1, 0, urls(imageUrl(0, "jpg"), "", "", "")));
-        PixivSite site = new PixivSite(gateway, config("session", 1024, 5));
+        gateway.ugoiraMetadata(ugoiraMetadata(originalSrc, "https://i.pximg.net/img-zip-ugoira/fallback.zip"));
+        gateway.download(originalSrc, zipBytes);
+        renderer.renderedBytes(renderedBytes);
+        PixivSite site = new PixivSite(gateway, config("session", 1024, 5), renderer);
+
+        SaucyProcessResponse response = site.process(match("106848609")).join().orElseThrow();
+
+        assertEquals(1, renderer.renderRequests);
+        assertArrayEquals(zipBytes, renderer.lastZipBytes);
+        assertEquals("mp4", renderer.lastFormat);
+        assertEquals(2000, renderer.lastBitrate);
+        assertEquals(1, response.files().size());
+    }
+
+    @Test
+    void ugoiraRendererOutputUnderMaxFileSizeProducesSingleFile() {
+        FakePixivGateway gateway = new FakePixivGateway();
+        FakeUgoiraRenderer renderer = new FakeUgoiraRenderer();
+        byte[] renderedBytes = new byte[]{4, 5, 6};
+        String originalSrc = "https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip";
+        gateway.details(illustration("106848609", 2, 1, 0, urls(imageUrl(0, "jpg"), "", "", "")));
+        gateway.ugoiraMetadata(ugoiraMetadata(originalSrc, ""));
+        gateway.download(originalSrc, new byte[]{1, 2, 3});
+        renderer.renderedBytes(renderedBytes);
+        PixivSite site = new PixivSite(gateway, config("session", 3, 5), renderer);
+
+        SaucyProcessResponse response = site.process(match("106848609")).join().orElseThrow();
+
+        assertFalse(response.sensitive());
+        assertEquals(1, response.files().size());
+        SaucyFileAttachment file = response.files().getFirst();
+        assertEquals("Title_ugoira.mp4", file.fileName());
+        assertEquals("video/mp4", file.contentType());
+        assertArrayEquals(renderedBytes, file.data());
+    }
+
+    @Test
+    void ugoiraRendererOutputOverMaxFileSizeReturnsEmpty() {
+        FakePixivGateway gateway = new FakePixivGateway();
+        FakeUgoiraRenderer renderer = new FakeUgoiraRenderer();
+        String originalSrc = "https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip";
+        gateway.details(illustration("106848609", 2, 1, 0, urls(imageUrl(0, "jpg"), "", "", "")));
+        gateway.ugoiraMetadata(ugoiraMetadata(originalSrc, ""));
+        gateway.download(originalSrc, new byte[]{1, 2});
+        renderer.renderedBytes(new byte[]{4, 5, 6});
+        PixivSite site = new PixivSite(gateway, config("session", 2, 5), renderer);
 
         Optional<SaucyProcessResponse> response = site.process(match("106848609")).join();
 
         assertTrue(response.isEmpty());
+        assertEquals(1, renderer.renderRequests);
+    }
+
+    @Test
+    void ugoiraResponseRemainsSensitiveWhenXRestricted() {
+        FakePixivGateway gateway = new FakePixivGateway();
+        FakeUgoiraRenderer renderer = new FakeUgoiraRenderer();
+        String originalSrc = "https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip";
+        gateway.details(illustration("106848609", 2, 1, 1, urls(imageUrl(0, "jpg"), "", "", "")));
+        gateway.ugoiraMetadata(ugoiraMetadata(originalSrc, ""));
+        gateway.download(originalSrc, new byte[]{1, 2, 3});
+        renderer.renderedBytes(new byte[]{4, 5, 6});
+        PixivSite site = new PixivSite(gateway, config("session", 1024, 5), renderer);
+
+        SaucyProcessResponse response = site.process(match("106848609")).join().orElseThrow();
+
+        assertTrue(response.sensitive());
+        assertEquals(1, response.files().size());
     }
 
     private static SaucyMatch match(String id) {
@@ -229,6 +296,18 @@ class PixivSiteTest {
         return new PixivPage(new PixivPageUrls(thumbMini, small, regular, original), 1200, 1600);
     }
 
+    private static PixivUgoiraMetadataResponse ugoiraMetadata(String originalSrc, String src) {
+        return new PixivUgoiraMetadataResponse(false, "", new PixivUgoiraMetadata(
+                originalSrc,
+                src,
+                "image/jpeg",
+                List.of(
+                        new PixivUgoiraFrame("000000.jpg", 60),
+                        new PixivUgoiraFrame("000001.jpg", 60)
+                )
+        ));
+    }
+
     private static String imageUrl(int page, String extension) {
         return "https://i.pximg.net/img-original/img/2023/04/01/00/00/00/106848609_p%d.%s"
                 .formatted(page, extension);
@@ -254,6 +333,7 @@ class PixivSiteTest {
     private static final class FakePixivGateway implements PixivGateway {
         private final boolean hasSessionCookie;
         private PixivIllustrationResponse details;
+        private PixivUgoiraMetadataResponse ugoiraMetadata;
         private final List<PixivPage> pages = new java.util.ArrayList<>();
         private final Map<String, Long> lengths = new HashMap<>();
         private final Map<String, byte[]> downloads = new HashMap<>();
@@ -275,6 +355,10 @@ class PixivSiteTest {
 
         private void page(PixivPage page) {
             pages.add(page);
+        }
+
+        private void ugoiraMetadata(PixivUgoiraMetadataResponse ugoiraMetadata) {
+            this.ugoiraMetadata = ugoiraMetadata;
         }
 
         private void length(String url, long length) {
@@ -303,6 +387,11 @@ class PixivSiteTest {
         }
 
         @Override
+        public Optional<PixivUgoiraMetadataResponse> ugoiraMetadata(String id) {
+            return Optional.ofNullable(ugoiraMetadata);
+        }
+
+        @Override
         public long contentLength(String url) {
             return lengths.getOrDefault(url, 0L);
         }
@@ -311,6 +400,27 @@ class PixivSiteTest {
         public Optional<byte[]> download(String url, long maxBytes) {
             downloadRequests++;
             return Optional.ofNullable(downloads.get(url));
+        }
+    }
+
+    private static final class FakeUgoiraRenderer implements PixivUgoiraRendererGateway {
+        private byte[] renderedBytes = new byte[0];
+        private int renderRequests;
+        private byte[] lastZipBytes;
+        private String lastFormat;
+        private int lastBitrate;
+
+        private void renderedBytes(byte[] renderedBytes) {
+            this.renderedBytes = renderedBytes;
+        }
+
+        @Override
+        public Optional<byte[]> render(byte[] zipBytes, PixivUgoiraMetadata metadata, String format, int bitrate) {
+            renderRequests++;
+            lastZipBytes = zipBytes;
+            lastFormat = format;
+            lastBitrate = bitrate;
+            return Optional.of(renderedBytes);
         }
     }
 }

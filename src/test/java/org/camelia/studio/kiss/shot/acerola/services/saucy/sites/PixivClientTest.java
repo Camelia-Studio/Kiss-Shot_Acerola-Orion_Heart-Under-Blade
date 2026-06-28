@@ -79,6 +79,54 @@ class PixivClientTest {
     }
 
     @Test
+    void fetchesUgoiraMetadataWithPixivHeadersAndCachesUsableJson() {
+        RecordingHttpClient httpClient = new RecordingHttpClient(response(200, ugoiraMetadataJson()));
+        PixivClient client = client(httpClient, "abc123");
+
+        Optional<PixivUgoiraMetadataResponse> first = client.ugoiraMetadata("106848609");
+        Optional<PixivUgoiraMetadataResponse> second = client.ugoiraMetadata("106848609");
+
+        assertTrue(first.isPresent());
+        assertTrue(second.isPresent());
+        assertEquals("https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip",
+                second.orElseThrow().body().originalSrc());
+        assertEquals(2, second.orElseThrow().body().frames().size());
+        assertEquals(1, httpClient.requestCount());
+        HttpRequest request = httpClient.requests().getFirst();
+        assertEquals("GET", request.method());
+        assertEquals(URI.create("https://www.pixiv.net/ajax/illust/106848609/ugoira_meta"), request.uri());
+        assertPixivHeaders(request);
+    }
+
+    @Test
+    void ugoiraMetadataReturnsEmptyAndDoesNotCacheUnusableJson() {
+        RecordingHttpClient httpClient = new RecordingHttpClient(
+                response(500, ugoiraMetadataJson()),
+                response(200, "<html>temporarily unavailable</html>"),
+                response(200, "{\"error\":true,\"message\":\"private\",\"body\":null}"),
+                response(200, "{\"error\":false,\"message\":\"\",\"body\":null}"),
+                response(200, ugoiraMetadataJson())
+        );
+        PixivClient client = client(httpClient, "abc123");
+
+        Optional<PixivUgoiraMetadataResponse> nonSuccess = client.ugoiraMetadata("106848609");
+        Optional<PixivUgoiraMetadataResponse> malformed = client.ugoiraMetadata("106848609");
+        Optional<PixivUgoiraMetadataResponse> error = client.ugoiraMetadata("106848609");
+        Optional<PixivUgoiraMetadataResponse> nullBody = client.ugoiraMetadata("106848609");
+        Optional<PixivUgoiraMetadataResponse> recovered = client.ugoiraMetadata("106848609");
+
+        assertTrue(nonSuccess.isEmpty());
+        assertTrue(malformed.isEmpty());
+        assertTrue(error.isEmpty());
+        assertTrue(nullBody.isEmpty());
+        assertTrue(recovered.isPresent());
+        assertEquals(5, httpClient.requestCount());
+        assertEquals(URI.create("https://www.pixiv.net/ajax/illust/106848609/ugoira_meta"),
+                httpClient.requests().get(4).uri());
+        assertPixivHeaders(httpClient.requests().get(4));
+    }
+
+    @Test
     void downloadReadsStreamWithPixivHeadersAndMaxBytesCap() {
         byte[] smallBytes = new byte[]{1, 2, 3};
         byte[] oversizedBytes = new byte[]{1, 2, 3, 4, 5};
@@ -188,6 +236,24 @@ class PixivClientTest {
                       "height": 1600
                     }
                   ]
+                }
+                """;
+    }
+
+    private static String ugoiraMetadataJson() {
+        return """
+                {
+                  "error": false,
+                  "message": "",
+                  "body": {
+                    "originalSrc": "https://i.pximg.net/img-zip-ugoira/106848609_ugoira1920x1080.zip",
+                    "src": "https://i.pximg.net/img-zip-ugoira/106848609_ugoira600x600.zip",
+                    "mime_type": "image/jpeg",
+                    "frames": [
+                      { "file": "000000.jpg", "delay": 60 },
+                      { "file": "000001.jpg", "delay": 60 }
+                    ]
+                  }
                 }
                 """;
     }
