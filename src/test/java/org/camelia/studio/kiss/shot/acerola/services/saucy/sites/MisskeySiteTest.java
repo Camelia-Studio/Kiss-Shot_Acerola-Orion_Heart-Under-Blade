@@ -85,30 +85,42 @@ class MisskeySiteTest {
         assertEquals("https://cdn.example/avatar.png", first.getAuthor().getIconUrl());
         assertEquals("Bonjour Misskey", first.getDescription());
         assertEquals("https://cdn.example/one.png", first.getImage().getUrl());
+        assertNull(second.getUrl());
+        assertNull(second.getDescription());
         assertEquals("https://cdn.example/two-thumb.jpg", second.getImage().getUrl());
         assertEquals("Misskey", first.getFooter().getText());
         assertEquals(OffsetDateTime.parse("2025-01-01T00:00:00Z"), first.getTimestamp());
     }
 
     @Test
-    void createsTextEmbedWhenThereAreNoImagesAndKeepsSensitiveFlagFromIgnoredFiles() {
+    void returnsEmptyWhenThereAreOnlyNonImageFiles() {
         FakeMisskeyGateway gateway = new FakeMisskeyGateway();
         gateway.note(note("abc123", "Texte seul", List.of(
                 file("1", "video/mp4", true, "https://cdn.example/video.mp4", "https://cdn.example/video-thumb.jpg")
         )));
         MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
 
-        SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();
+        Optional<SaucyProcessResponse> response = site.process(match("https://misskey.io", "abc123")).join();
 
-        assertTrue(response.sensitive());
-        assertTrue(response.files().isEmpty());
-        assertEquals(1, response.embeds().size());
-        assertEquals("Texte seul", response.embeds().getFirst().getDescription());
-        assertNull(response.embeds().getFirst().getImage());
+        assertTrue(response.isEmpty());
     }
 
     @Test
-    void fallsBackToTextEmbedWhenAllImageUrlsAreInvalid() {
+    void marksResponseSensitiveWhenAnyImageFileIsSensitive() {
+        FakeMisskeyGateway gateway = new FakeMisskeyGateway();
+        gateway.note(note("abc123", "Image sensible", List.of(
+                file("1", "image/png", true, "https://cdn.example/image.png", "https://cdn.example/image-thumb.png")
+        )));
+        MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
+
+        SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();
+
+        assertTrue(response.sensitive());
+        assertEquals(1, response.embeds().size());
+    }
+
+    @Test
+    void returnsEmptyWhenAllImageUrlsAreInvalid() {
         FakeMisskeyGateway gateway = new FakeMisskeyGateway();
         gateway.note(note("abc123", "Images invalides", List.of(
                 file("1", "image/png", false, "", ""),
@@ -116,17 +128,17 @@ class MisskeySiteTest {
         )));
         MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
 
-        SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();
+        Optional<SaucyProcessResponse> response = site.process(match("https://misskey.io", "abc123")).join();
 
-        assertEquals(1, response.embeds().size());
-        assertEquals("Images invalides", response.embeds().getFirst().getDescription());
-        assertNull(response.embeds().getFirst().getImage());
+        assertTrue(response.isEmpty());
     }
 
     @Test
     void truncatesLongDescriptionsToDiscordLimit() {
         FakeMisskeyGateway gateway = new FakeMisskeyGateway();
-        gateway.note(note("abc123", "x".repeat(5_000), List.of()));
+        gateway.note(note("abc123", "x".repeat(5_000), List.of(
+                file("1", "image/png", false, "https://cdn.example/image.png", "")
+        )));
         MisskeySite site = new MisskeySite(gateway, config(List.of("misskey.io")));
 
         SaucyProcessResponse response = site.process(match("https://misskey.io", "abc123")).join().orElseThrow();

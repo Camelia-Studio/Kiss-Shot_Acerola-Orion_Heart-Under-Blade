@@ -97,37 +97,45 @@ public class MisskeySite implements SaucySite {
                 .map(MisskeySite::imageUrl)
                 .flatMap(Optional::stream)
                 .toList();
-
-        List<MessageEmbed> embeds;
         if (imageUrls.isEmpty()) {
-            embeds = List.of(embed(note.get(), baseUrl, id, null));
-        } else {
-            embeds = imageUrls.stream()
-                    .map(imageUrl -> embed(note.get(), baseUrl, id, imageUrl))
-                    .toList();
+            return Optional.empty();
+        }
+
+        List<MessageEmbed> embeds = new ArrayList<>();
+        for (int index = 0; index < imageUrls.size(); index++) {
+            embeds.add(embed(note.get(), baseUrl, id, imageUrls.get(index), index == 0));
         }
 
         return Optional.of(new SaucyProcessResponse(null, embeds, List.of(), sensitive));
     }
 
-    private static MessageEmbed embed(MisskeyNote note, String baseUrl, String id, String imageUrl) {
+    private static MessageEmbed embed(
+            MisskeyNote note,
+            String baseUrl,
+            String id,
+            String imageUrl,
+            boolean includeMetadata
+    ) {
         String noteUrl = baseUrl + "/notes/" + id;
         EmbedBuilder builder = new EmbedBuilder()
                 .setColor(MISSKEY_GREEN)
-                .setTitle("Misskey", noteUrl)
                 .setFooter("Misskey");
 
-        String description = description(note);
-        if (!description.isBlank()) {
-            builder.setDescription(description);
-        }
+        if (includeMetadata) {
+            builder.setTitle("Misskey", noteUrl);
 
-        MisskeyUser user = note.user();
-        if (user != null) {
-            builder.setAuthor(authorName(user), noteUrl, validHttpUrlOrNull(user.avatarUrl()));
-        }
+            String description = description(note);
+            if (!description.isBlank()) {
+                builder.setDescription(description);
+            }
 
-        parseTimestamp(note.createdAt()).ifPresent(builder::setTimestamp);
+            MisskeyUser user = note.user();
+            if (user != null) {
+                builder.setAuthor(authorName(user), noteUrl, validHttpUrlOrNull(user.avatarUrl()));
+            }
+
+            parseTimestamp(note.createdAt()).ifPresent(builder::setTimestamp);
+        }
 
         if (imageUrl != null) {
             builder.setImage(imageUrl);
