@@ -75,6 +75,32 @@ class FxTwitterSiteTest {
     }
 
     @Test
+    void capturesTwoAndFiveCharacterTranslateCodes() {
+        FxTwitterSite site = new FxTwitterSite(new FakeFxTwitterGateway(), config(1024));
+        String content = """
+                https://twitter.com/alice/status/123/en
+                https://twitter.com/bob/status/456/photo/1/pt_BR
+                """;
+
+        List<SaucyMatch> matches = site.match(content, 10);
+
+        assertEquals(2, matches.size());
+        assertEquals("en", matches.get(0).groups().get("translate"));
+        assertEquals("pt_BR", matches.get(1).groups().get("translate"));
+    }
+
+    @Test
+    void doesNotTreatLongPathAsTranslate() {
+        FxTwitterSite site = new FxTwitterSite(new FakeFxTwitterGateway(), config(1024));
+
+        List<SaucyMatch> matches = site.match("https://twitter.com/alice/status/123/english", 10);
+
+        assertEquals(1, matches.size());
+        assertEquals("https://twitter.com/alice/status/123", matches.getFirst().url());
+        assertEquals("", matches.getFirst().groups().get("translate"));
+    }
+
+    @Test
     void createsEmbedForRegularTweet() {
         FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
         gateway.response(tweet("123", "Hello world", false, List.of(), List.of(), null));
@@ -108,8 +134,8 @@ class FxTwitterSiteTest {
     void createsEmbedPerPhoto() {
         FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
         List<FxTwitterPhoto> photos = List.of(
-                new FxTwitterPhoto("https://pbs.twimg.com/media/one.jpg?format=jpg&name=small", 800, 600),
-                new FxTwitterPhoto("https://pbs.twimg.com/media/two.jpg", 800, 600)
+                new FxTwitterPhoto("photo", "https://pbs.twimg.com/media/one.jpg?format=jpg&name=small", 800, 600),
+                new FxTwitterPhoto("photo", "https://pbs.twimg.com/media/two.jpg", 800, 600)
         );
         gateway.response(tweet("123", "Photo tweet", false, photos, List.of(), null));
         FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
@@ -219,7 +245,7 @@ class FxTwitterSiteTest {
                 "https://twitter.com/alice/status/" + id,
                 text,
                 1_735_689_600L,
-                new FxTwitterAuthor("Alice", "alice", "https://cdn.example/avatar.png", null),
+                new FxTwitterAuthor("42", "Alice", "alice", "https://cdn.example/avatar.png", null),
                 null,
                 null,
                 null,

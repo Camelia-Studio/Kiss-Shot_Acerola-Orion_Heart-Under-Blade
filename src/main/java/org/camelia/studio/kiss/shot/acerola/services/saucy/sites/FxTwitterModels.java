@@ -31,6 +31,7 @@ record FxTwitterTweet(
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 record FxTwitterAuthor(
+        @JsonProperty("id") String id,
         @JsonProperty("name") String name,
         @JsonProperty("screen_name") String screenName,
         @JsonProperty("avatar_url") String avatarUrl,
@@ -47,6 +48,7 @@ record FxTwitterMedia(
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 record FxTwitterPhoto(
+        @JsonProperty("type") String type,
         @JsonProperty("url") String url,
         @JsonProperty("width") Integer width,
         @JsonProperty("height") Integer height

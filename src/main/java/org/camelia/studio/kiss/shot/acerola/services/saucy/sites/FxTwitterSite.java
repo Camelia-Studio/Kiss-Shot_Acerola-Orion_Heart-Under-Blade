@@ -29,7 +29,7 @@ public class FxTwitterSite implements SaucySite {
     private static final Pattern URL_PATTERN = Pattern.compile(
             "https?://(?:www\\.)?(?:mobile\\.twitter\\.com|twitter\\.com|x\\.com|nitter\\.com|nitter\\.net)/" +
                     "(?<user>[A-Za-z0-9_]+)/status/(?<id>\\d+)(?:/(?:video|photo)/\\d+)?" +
-                    "(?:/(?<translate>[A-Za-z][A-Za-z0-9_-]*))?"
+                    "(?:/(?<translate>\\w{2}|\\w{5})(?!\\w))?"
     );
 
     private final FxTwitterGateway gateway;
