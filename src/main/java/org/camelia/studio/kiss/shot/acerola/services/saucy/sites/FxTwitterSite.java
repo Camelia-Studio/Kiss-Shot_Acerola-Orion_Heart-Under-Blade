@@ -26,6 +26,8 @@ import java.util.regex.Pattern;
 public class FxTwitterSite implements SaucySite {
     private static final String ID = "fxtwitter";
     private static final int TWITTER_BLUE = 0x1DA1F2;
+    private static final int MAX_DESCRIPTION_LENGTH = 4_096;
+    private static final String DESCRIPTION_TRUNCATION_SUFFIX = "...";
     private static final Pattern URL_PATTERN = Pattern.compile(
             "https?://(?:www\\.)?(?:mobile\\.twitter\\.com|twitter\\.com|x\\.com|nitter\\.com|nitter\\.net)/" +
                     "(?<user>[A-Za-z0-9_]+)/status/(?<id>\\d+)(?:/(?:video|photo)/\\d+)?" +
@@ -159,11 +161,19 @@ public class FxTwitterSite implements SaucySite {
     }
 
     private static String description(FxTwitterTweet tweet) {
+        String description;
         if (tweet.translation() != null && tweet.translation().text() != null && !tweet.translation().text().isBlank()) {
-            return tweet.translation().text();
+            description = tweet.translation().text();
+        } else {
+            description = tweet.text() == null ? "" : tweet.text();
         }
 
-        return tweet.text() == null ? "" : tweet.text();
+        if (description.length() <= MAX_DESCRIPTION_LENGTH) {
+            return description;
+        }
+
+        return description.substring(0, MAX_DESCRIPTION_LENGTH - DESCRIPTION_TRUNCATION_SUFFIX.length())
+                + DESCRIPTION_TRUNCATION_SUFFIX;
     }
 
     private static List<String> photoUrls(FxTwitterTweet tweet) {

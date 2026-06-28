@@ -145,6 +145,33 @@ class FxTwitterSiteTest {
     }
 
     @Test
+    void truncatesLongTweetDescription() {
+        FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
+        gateway.response(tweet("123", "x".repeat(5_000), false, List.of(), List.of(), null));
+        FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
+
+        SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
+
+        String description = response.embeds().getFirst().getDescription();
+        assertEquals(4_096, description.length());
+        assertTrue(description.endsWith("..."));
+    }
+
+    @Test
+    void truncatesLongTranslatedDescription() {
+        FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
+        FxTwitterTranslation translation = new FxTwitterTranslation("t".repeat(5_000), "ja", "fr");
+        gateway.response(tweet("123", "Original", false, List.of(), List.of(), translation));
+        FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
+
+        SaucyProcessResponse response = site.process(match("alice", "123", "fr")).join().orElseThrow();
+
+        String description = response.embeds().getFirst().getDescription();
+        assertEquals(4_096, description.length());
+        assertTrue(description.endsWith("..."));
+    }
+
+    @Test
     void createsEmbedPerPhoto() {
         FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
         List<FxTwitterPhoto> photos = List.of(
