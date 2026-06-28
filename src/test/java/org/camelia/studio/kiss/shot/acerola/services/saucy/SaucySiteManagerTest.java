@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SaucySiteManagerTest {
@@ -55,6 +56,22 @@ class SaucySiteManagerTest {
         List<SaucyProcessResponse> responses = manager.process("content").join();
 
         assertEquals(List.of(first, second), responses);
+    }
+
+    @Test
+    void skipsThrowingMatcherAndContinuesWithLaterSites() {
+        ThrowingSite throwing = new ThrowingSite("throwing");
+        FakeSite later = new FakeSite("later", List.of(match("later", "success")));
+        SaucyProcessResponse response = response("later response");
+        later.response("success", CompletableFuture.completedFuture(Optional.of(response)));
+        SaucySiteManager manager = new SaucySiteManager(List.of(throwing, later), configWithMaxLinks(8));
+
+        List<SaucyMatch> matches = assertDoesNotThrow(() -> manager.match("content"));
+        CompletableFuture<List<SaucyProcessResponse>> processFuture =
+                assertDoesNotThrow(() -> manager.process("content"));
+
+        assertEquals(List.of(match("later", "success")), matches);
+        assertEquals(List.of(response), processFuture.join());
     }
 
     private static SaucyLinkEmbedConfig configWithMaxLinks(int maxLinks) {
@@ -117,6 +134,29 @@ class SaucySiteManagerTest {
         @Override
         public CompletableFuture<Optional<SaucyProcessResponse>> process(SaucyMatch match) {
             return responses.getOrDefault(match.url(), CompletableFuture.completedFuture(Optional.empty()));
+        }
+    }
+
+    private static final class ThrowingSite implements SaucySite {
+        private final String id;
+
+        private ThrowingSite(String id) {
+            this.id = id;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        @Override
+        public List<SaucyMatch> match(String content, int remainingSlots) {
+            throw new IllegalStateException("match failed");
+        }
+
+        @Override
+        public CompletableFuture<Optional<SaucyProcessResponse>> process(SaucyMatch match) {
+            return CompletableFuture.completedFuture(Optional.empty());
         }
     }
 }

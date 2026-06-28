@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SaucyMessagePartitionerTest {
 
@@ -75,6 +76,16 @@ class SaucyMessagePartitionerTest {
         assertEquals(List.of(), messages.get(0).files());
         assertEquals(null, messages.get(1).text());
         assertEquals(List.of(file), messages.get(1).files());
+    }
+
+    @Test
+    void rejectsZeroMaximumEmbedsPerMessage() {
+        assertThrows(IllegalArgumentException.class, () -> new SaucyMessagePartitioner(0, 10));
+    }
+
+    @Test
+    void rejectsZeroMaximumFileBytes() {
+        assertThrows(IllegalArgumentException.class, () -> new SaucyMessagePartitioner(1, 0));
     }
 
     private static MessageEmbed embed(String description) {

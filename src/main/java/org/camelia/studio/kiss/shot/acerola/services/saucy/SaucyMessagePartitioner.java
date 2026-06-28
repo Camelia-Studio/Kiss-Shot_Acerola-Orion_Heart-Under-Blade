@@ -10,6 +10,13 @@ public class SaucyMessagePartitioner {
     private final long maxFileBytes;
 
     public SaucyMessagePartitioner(int maxEmbedsPerMessage, long maxFileBytes) {
+        if (maxEmbedsPerMessage <= 0) {
+            throw new IllegalArgumentException("maxEmbedsPerMessage must be positive");
+        }
+        if (maxFileBytes <= 0) {
+            throw new IllegalArgumentException("maxFileBytes must be positive");
+        }
+
         this.maxEmbedsPerMessage = maxEmbedsPerMessage;
         this.maxFileBytes = maxFileBytes;
     }

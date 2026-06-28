@@ -37,9 +37,13 @@ public class SaucySiteManager {
                 break;
             }
 
-            List<SaucyMatch> siteMatches = site.match(content, remainingSlots);
-            int acceptedMatches = Math.min(siteMatches.size(), remainingSlots);
-            matches.addAll(siteMatches.subList(0, acceptedMatches));
+            try {
+                List<SaucyMatch> siteMatches = site.match(content, remainingSlots);
+                int acceptedMatches = Math.min(siteMatches.size(), remainingSlots);
+                matches.addAll(siteMatches.subList(0, acceptedMatches));
+            } catch (RuntimeException exception) {
+                logger.warn("Failed to match saucy links for site {}", site.id(), exception);
+            }
         }
 
         return List.copyOf(matches);
