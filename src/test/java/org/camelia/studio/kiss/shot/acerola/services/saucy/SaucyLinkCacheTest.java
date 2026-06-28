@@ -46,6 +46,22 @@ class SaucyLinkCacheTest {
     }
 
     @Test
+    void nullLoaderResultIsNotCached() {
+        SaucyLinkCache<String> cache = new SaucyLinkCache<>(Duration.ofSeconds(10), () -> 1_000);
+        AtomicInteger calls = new AtomicInteger();
+
+        String first = cache.get("key", () -> {
+            calls.incrementAndGet();
+            return null;
+        });
+        String second = cache.get("key", () -> "value-" + calls.incrementAndGet());
+
+        assertEquals(null, first);
+        assertEquals("value-2", second);
+        assertEquals(2, calls.get());
+    }
+
+    @Test
     void returnsTypedValuesWithoutSharedMapCasts() {
         SaucyLinkCache<Integer> cache = new SaucyLinkCache<>(Duration.ofSeconds(10), () -> 1_000);
 

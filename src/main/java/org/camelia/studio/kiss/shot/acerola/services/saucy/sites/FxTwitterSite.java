@@ -29,7 +29,8 @@ public class FxTwitterSite implements SaucySite {
     private static final Pattern URL_PATTERN = Pattern.compile(
             "https?://(?:www\\.)?(?:mobile\\.twitter\\.com|twitter\\.com|x\\.com|nitter\\.com|nitter\\.net)/" +
                     "(?<user>[A-Za-z0-9_]+)/status/(?<id>\\d+)(?:/(?:video|photo)/\\d+)?" +
-                    "(?:/(?<translate>\\w{2}|\\w{5})(?!\\w))?"
+                    "(?:/(?<translate>\\w{2}|\\w{2}_\\w{2}))?" +
+                    "(?=$|[\\s<>)\\].,!?:;]|\\?)"
     );
 
     private final FxTwitterGateway gateway;
@@ -90,7 +91,7 @@ public class FxTwitterSite implements SaucySite {
                 return Optional.of(fallback(tweet, id, user));
             }
 
-            byte[] bytes = gateway.download(video.url());
+            byte[] bytes = gateway.download(video.url(), config.maxFileBytes());
             if (bytes.length == 0 || bytes.length > config.maxFileBytes()) {
                 return Optional.of(fallback(tweet, id, user));
             }
@@ -104,10 +105,10 @@ public class FxTwitterSite implements SaucySite {
             ));
         }
 
-        List<FxTwitterPhoto> photos = photos(tweet);
-        if (!photos.isEmpty()) {
-            List<MessageEmbed> embeds = photos.stream()
-                    .map(photo -> embed(tweet, originalPhotoUrl(photo.url())))
+        List<String> photoUrls = photoUrls(tweet);
+        if (!photoUrls.isEmpty()) {
+            List<MessageEmbed> embeds = photoUrls.stream()
+                    .map(photoUrl -> embed(tweet, originalPhotoUrl(photoUrl)))
                     .toList();
             return Optional.of(new SaucyProcessResponse(null, embeds, List.of(), sensitive(tweet)));
         }
@@ -165,12 +166,15 @@ public class FxTwitterSite implements SaucySite {
         return tweet.text() == null ? "" : tweet.text();
     }
 
-    private static List<FxTwitterPhoto> photos(FxTwitterTweet tweet) {
+    private static List<String> photoUrls(FxTwitterTweet tweet) {
         if (tweet.media() == null || tweet.media().photos() == null) {
             return List.of();
         }
 
-        return tweet.media().photos();
+        return tweet.media().photos().stream()
+                .map(FxTwitterPhoto::url)
+                .filter(FxTwitterSite::isHttpUrl)
+                .toList();
     }
 
     private static Optional<FxTwitterVideo> firstVideo(FxTwitterTweet tweet) {
@@ -182,15 +186,25 @@ public class FxTwitterSite implements SaucySite {
     }
 
     private static String originalPhotoUrl(String url) {
-        if (url == null || url.isBlank()) {
-            return url;
-        }
-
         if (url.contains("name=")) {
             return url.replaceAll("([?&]name=)[^&]+", "$1orig");
         }
 
         return url + (url.contains("?") ? "&" : "?") + "name=orig";
+    }
+
+    private static boolean isHttpUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+
+        try {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+        } catch (URISyntaxException exception) {
+            return false;
+        }
     }
 
     private static String fileName(String url, String id) {

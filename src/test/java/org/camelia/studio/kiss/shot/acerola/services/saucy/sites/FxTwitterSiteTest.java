@@ -44,6 +44,17 @@ class FxTwitterSiteTest {
     }
 
     @Test
+    void matchesWwwTwitterUrls() {
+        FxTwitterSite site = new FxTwitterSite(new FakeFxTwitterGateway(), config(1024));
+
+        List<SaucyMatch> matches = site.match("https://www.twitter.com/alice/status/123", 10);
+
+        assertEquals(1, matches.size());
+        assertEquals("alice", matches.getFirst().groups().get("user"));
+        assertEquals("123", matches.getFirst().groups().get("id"));
+    }
+
+    @Test
     void ignoresPhotoAndVideoSuffixesWhenMatching() {
         FxTwitterSite site = new FxTwitterSite(new FakeFxTwitterGateway(), config(1024));
         String content = """
@@ -90,14 +101,17 @@ class FxTwitterSiteTest {
     }
 
     @Test
-    void doesNotTreatLongPathAsTranslate() {
+    void doesNotMatchInvalidStatusSuffixes() {
         FxTwitterSite site = new FxTwitterSite(new FakeFxTwitterGateway(), config(1024));
+        String content = """
+                https://twitter.com/alice/status/123abc
+                https://twitter.com/alice/status/123/english
+                https://twitter.com/alice/status/123/photo/1/extra
+                """;
 
-        List<SaucyMatch> matches = site.match("https://twitter.com/alice/status/123/english", 10);
+        List<SaucyMatch> matches = site.match(content, 10);
 
-        assertEquals(1, matches.size());
-        assertEquals("https://twitter.com/alice/status/123", matches.getFirst().url());
-        assertEquals("", matches.getFirst().groups().get("translate"));
+        assertEquals(0, matches.size());
     }
 
     @Test
@@ -146,6 +160,40 @@ class FxTwitterSiteTest {
         assertTrue(response.files().isEmpty());
         assertTrue(response.embeds().get(0).getImage().getUrl().contains("name=orig"));
         assertTrue(response.embeds().get(1).getImage().getUrl().contains("name=orig"));
+    }
+
+    @Test
+    void ignoresInvalidPhotoUrls() {
+        FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
+        List<FxTwitterPhoto> photos = List.of(
+                new FxTwitterPhoto("photo", "", 800, 600),
+                new FxTwitterPhoto("photo", "ftp://pbs.twimg.com/media/invalid.jpg", 800, 600),
+                new FxTwitterPhoto("photo", "https://pbs.twimg.com/media/valid.jpg", 800, 600)
+        );
+        gateway.response(tweet("123", "Photo tweet", false, photos, List.of(), null));
+        FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
+
+        SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
+
+        assertEquals(1, response.embeds().size());
+        assertEquals("https://pbs.twimg.com/media/valid.jpg?name=orig", response.embeds().getFirst().getImage().getUrl());
+    }
+
+    @Test
+    void fallsBackToRegularEmbedWhenAllPhotoUrlsAreInvalid() {
+        FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
+        List<FxTwitterPhoto> photos = List.of(
+                new FxTwitterPhoto("photo", "", 800, 600),
+                new FxTwitterPhoto("photo", "file:///tmp/invalid.jpg", 800, 600)
+        );
+        gateway.response(tweet("123", "Photo tweet", false, photos, List.of(), null));
+        FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
+
+        SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
+
+        assertEquals(1, response.embeds().size());
+        assertEquals("Photo tweet", response.embeds().getFirst().getDescription());
+        assertEquals(null, response.embeds().getFirst().getImage());
     }
 
     @Test
@@ -222,6 +270,23 @@ class FxTwitterSiteTest {
         SaucyFileAttachment file = response.files().getFirst();
         assertEquals("tweet-video.mp4", file.fileName());
         assertArrayEquals(videoBytes, file.data());
+    }
+
+    @Test
+    void uploadsVideoWithUnknownHeadWhenDownloadedBytesAreSmall() {
+        FakeFxTwitterGateway gateway = new FakeFxTwitterGateway();
+        String videoUrl = "https://video.example/path/tweet-video.mp4";
+        byte[] videoBytes = new byte[]{1, 2, 3};
+        gateway.response(tweet("123", "Video tweet", false, List.of(), List.of(video(videoUrl)), null));
+        gateway.length(videoUrl, 0);
+        gateway.download(videoUrl, videoBytes);
+        FxTwitterSite site = new FxTwitterSite(gateway, config(1024));
+
+        SaucyProcessResponse response = site.process(match("alice", "123", null)).join().orElseThrow();
+
+        assertEquals(1, response.embeds().size());
+        assertEquals(1, response.files().size());
+        assertArrayEquals(videoBytes, response.files().getFirst().data());
     }
 
     private static SaucyMatch match(String user, String id, String translate) {
@@ -306,7 +371,7 @@ class FxTwitterSiteTest {
         }
 
         @Override
-        public byte[] download(String url) {
+        public byte[] download(String url, long maxBytes) {
             return downloads.getOrDefault(url, new byte[0]);
         }
     }
