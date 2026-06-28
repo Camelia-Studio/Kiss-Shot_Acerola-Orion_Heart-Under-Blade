@@ -3,7 +3,10 @@ package org.camelia.studio.kiss.shot.acerola.services.saucy;
 import java.util.regex.Pattern;
 
 public final class SaucyIgnoredContent {
-    private static final Pattern IGNORED_LINK = Pattern.compile("(<|\\|\\|)https?://[^\\s>]+(>|\\|\\|)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IGNORED_LINK = Pattern.compile(
+            "(<https?://[^\\s>]+>|\\|\\|https?://[^\\s|]+\\|\\|)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private SaucyIgnoredContent() {
     }

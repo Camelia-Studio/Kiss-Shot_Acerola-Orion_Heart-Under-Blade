@@ -15,6 +15,14 @@ class SaucyIgnoredContentTest {
     }
 
     @Test
+    void ignoresOnlyPairedUrlMasks() {
+        assertTrue(SaucyIgnoredContent.hasIgnoredLink("look <https://example.com>"));
+        assertTrue(SaucyIgnoredContent.hasIgnoredLink("look ||https://example.com||"));
+        assertFalse(SaucyIgnoredContent.hasIgnoredLink("look <https://example.com||"));
+        assertFalse(SaucyIgnoredContent.hasIgnoredLink("look ||https://example.com>"));
+    }
+
+    @Test
     void ignoresOnlyUrlMasksAndNotMentions() {
         assertFalse(SaucyIgnoredContent.hasIgnoredLink("hello <@123> and <#456>"));
         assertFalse(SaucyIgnoredContent.hasIgnoredLink("plain text ||spoiler without url||"));

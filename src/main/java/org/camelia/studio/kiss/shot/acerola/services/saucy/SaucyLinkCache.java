@@ -5,10 +5,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
-public class SaucyLinkCache {
+public class SaucyLinkCache<T> {
     private final Duration ttl;
     private final LongSupplier clockMillis;
-    private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CacheEntry<T>> cache = new ConcurrentHashMap<>();
 
     public SaucyLinkCache(Duration ttl, LongSupplier clockMillis) {
         this.ttl = ttl;
@@ -19,23 +19,18 @@ public class SaucyLinkCache {
         this(ttl, System::currentTimeMillis);
     }
 
-    @SuppressWarnings("unchecked")
-    public <T> T get(String key, Supplier<T> loader) {
+    public T get(String key, Supplier<T> loader) {
         long now = clockMillis.getAsLong();
-        CacheEntry existing = cache.get(key);
-        if (existing != null && existing.expiresAtMillis() > now) {
-            return (T) existing.value();
-        }
+        return cache.compute(key, (ignored, existing) -> {
+            if (existing != null && existing.expiresAtMillis() > now) {
+                return existing;
+            }
 
-        if (existing != null) {
-            cache.remove(key, existing);
-        }
-
-        T loaded = loader.get();
-        cache.put(key, new CacheEntry(loaded, now + ttl.toMillis()));
-        return loaded;
+            T loaded = loader.get();
+            return new CacheEntry<>(loaded, now + ttl.toMillis());
+        }).value();
     }
 
-    private record CacheEntry(Object value, long expiresAtMillis) {
+    private record CacheEntry<T>(T value, long expiresAtMillis) {
     }
 }
