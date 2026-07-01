@@ -39,9 +39,10 @@ public class CommandManager {
                 .addCommands(
                         slashCommands
                                 .stream()
-                                .map(
-                                        (cmd) -> Commands.slash(cmd.getName(), cmd.getDescription()).addOptions(cmd.getOptions())
-                                )
+                                .map((cmd) -> Commands
+                                        .slash(cmd.getName(), cmd.getDescription())
+                                        .addOptions(cmd.getOptions())
+                                        .setDefaultPermissions(cmd.defaultPermissions()))
                                 .toList()
                 )
                 .queue();
@@ -61,4 +62,3 @@ public class CommandManager {
         event.reply("Commande inconnue !").setEphemeral(true).queue();
     }
 }
-

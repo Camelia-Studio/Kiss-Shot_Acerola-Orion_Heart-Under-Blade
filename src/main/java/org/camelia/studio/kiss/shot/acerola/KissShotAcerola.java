@@ -6,6 +6,7 @@ import org.camelia.studio.kiss.shot.acerola.db.HibernateConfig;
 import org.camelia.studio.kiss.shot.acerola.listeners.bot.ReadyListener;
 import org.camelia.studio.kiss.shot.acerola.managers.ListenerManager;
 import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
+import org.camelia.studio.kiss.shot.acerola.utils.OpusNativeLibraryLoader;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.requests.GatewayIntent;
@@ -21,6 +22,7 @@ public class KissShotAcerola {
     public static void main(String[] args) {
         try {
             Configuration.getInstance();
+            OpusNativeLibraryLoader.preloadFromEnvironment();
 
             jda = JDABuilder.createDefault(Configuration.getInstance().getDotenv().get("BOT_TOKEN"))
                     .addEventListeners(new ReadyListener())

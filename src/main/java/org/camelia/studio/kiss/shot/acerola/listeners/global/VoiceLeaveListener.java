@@ -1,6 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
+import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
 
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
@@ -16,6 +17,12 @@ public class VoiceLeaveListener extends ListenerAdapter {
         
         // Vérifie si le bot est connecté à un canal vocal
         if (!audioManager.isConnected()) {
+            return;
+        }
+
+        RecordingService recordingService = RecordingService.getInstance();
+        if (recordingService.hasActiveRecording(guild.getIdLong())) {
+            recordingService.refreshEmptyChannelTimeout(guild);
             return;
         }
 

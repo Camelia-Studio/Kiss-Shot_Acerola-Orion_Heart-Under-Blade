@@ -14,6 +14,7 @@ import java.util.List;
 
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
 
 public class PlayCommand implements ISlashCommand {
     @Override
@@ -46,6 +47,14 @@ public class PlayCommand implements ISlashCommand {
         }
 
         AudioManager audioManager = event.getGuild().getAudioManager();
+        RecordingService recordingService = RecordingService.getInstance();
+
+        if (recordingService.hasActiveRecording(event.getGuild().getIdLong())
+                && !recordingService.isRecordingChannel(event.getGuild().getIdLong(), voiceState.getChannel().getIdLong())) {
+            event.getHook().editOriginal("Un enregistrement est en cours dans un autre salon vocal, je ne peux pas changer de salon.")
+                    .queue();
+            return;
+        }
 
         if (!audioManager.isConnected()) {
             audioManager.openAudioConnection(voiceState.getChannel());

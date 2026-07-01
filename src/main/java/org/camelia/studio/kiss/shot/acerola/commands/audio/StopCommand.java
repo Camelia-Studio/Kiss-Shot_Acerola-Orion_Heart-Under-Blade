@@ -3,6 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.commands.audio;
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -44,6 +45,11 @@ public class StopCommand implements ISlashCommand {
         // Arrêter la musique
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
         musicManager.audioPlayer.stopTrack();
+
+        if (RecordingService.getInstance().hasActiveRecording(event.getGuild().getIdLong())) {
+            event.reply("Musique arrêtée. Je reste connecté car un enregistrement est en cours.").queue();
+            return;
+        }
 
         // Déconnecter le bot
         audioManager.closeAudioConnection();
