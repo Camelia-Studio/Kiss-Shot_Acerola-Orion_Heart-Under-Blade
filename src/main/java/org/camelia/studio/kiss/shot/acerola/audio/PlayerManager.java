@@ -1,5 +1,6 @@
 package org.camelia.studio.kiss.shot.acerola.audio;
 
+import com.sedmelluq.discord.lavaplayer.format.StandardAudioDataFormats;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
@@ -22,6 +23,7 @@ public class PlayerManager {
     public PlayerManager() {
         this.musicManagers = new HashMap<>();
         this.audioPlayerManager = new DefaultAudioPlayerManager();
+        this.audioPlayerManager.getConfiguration().setOutputFormat(StandardAudioDataFormats.DISCORD_PCM_S16_BE);
         AudioSourceManagers.registerRemoteSources(audioPlayerManager);
     }
 
@@ -34,10 +36,15 @@ public class PlayerManager {
 
     public GuildMusicManager getMusicManager(Guild guild) {
         return musicManagers.computeIfAbsent(guild.getIdLong(), (guildId) -> {
-            final GuildMusicManager guildMusicManager = new GuildMusicManager(audioPlayerManager);
+            final GuildMusicManager guildMusicManager = new GuildMusicManager(audioPlayerManager, guildId);
             guild.getAudioManager().setSendingHandler(guildMusicManager.getSendHandler());
             return guildMusicManager;
         });
+    }
+
+    public boolean isMusicPlaying(Guild guild) {
+        GuildMusicManager musicManager = musicManagers.get(guild.getIdLong());
+        return musicManager != null && musicManager.audioPlayer.getPlayingTrack() != null;
     }
 
     public void loadAndPlay(GuildMessageChannel channel, String url) {

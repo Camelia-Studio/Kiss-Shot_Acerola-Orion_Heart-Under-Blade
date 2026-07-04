@@ -28,10 +28,12 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.10")
     implementation("io.github.cdimascio:dotenv-kotlin:6.5.1")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.2")
+    implementation("net.java.dev.jna:jna:5.19.1")
     implementation("net.dv8tion:JDA:6.4.1")
     implementation("ch.qos.logback:logback-classic:1.5.32")
     implementation("dev.arbjerg:lavaplayer:2.2.6")
     implementation("jakarta.annotation:jakarta.annotation-api:3.0.0")
+    implementation("commons-codec:commons-codec:1.22.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
