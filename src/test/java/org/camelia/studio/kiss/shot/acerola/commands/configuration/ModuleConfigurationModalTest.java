@@ -2,8 +2,12 @@ package org.camelia.studio.kiss.shot.acerola.commands.configuration;
 
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.Component;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.interactions.modals.ModalMapping;
 import net.dv8tion.jda.api.modals.Modal;
+import net.dv8tion.jda.api.utils.data.DataArray;
+import net.dv8tion.jda.api.utils.data.DataObject;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
@@ -11,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -92,8 +97,8 @@ class ModuleConfigurationModalTest {
 
         assertSelectorRequirement(createModal(guild, ModuleType.LINK_ENRICHMENT), 0, false);
         assertSelectorRequirement(createModal(guild, ModuleType.ANTI_RAID), 1, false);
-        assertSelectorRequirement(createModal(guild, ModuleType.AUTO_SANCTION_CHANNEL), 2, false);
-        assertSelectorRequirement(createModal(guild, ModuleType.AUTO_SANCTION_ROLE), 2, false);
+        assertSelectorRequirement(createModal(guild, ModuleType.AUTO_SANCTION_CHANNEL), 1, false);
+        assertSelectorRequirement(createModal(guild, ModuleType.AUTO_SANCTION_ROLE), 1, false);
     }
 
     @Test
@@ -112,18 +117,67 @@ class ModuleConfigurationModalTest {
         assertEquals(ConfigurationChannelTypes.guildMessageChannels(), selector.getChannelTypes());
     }
 
+    @Test
+    void targetedModerationModalsRespectDiscordsFiveComponentLimit() {
+        Guild guild = emptyGuild();
+        ModuleConfiguration antiRaid = configuration(ModuleType.ANTI_RAID);
+        ModuleConfiguration channelSanction = configuration(ModuleType.AUTO_SANCTION_CHANNEL);
+
+        for (ModuleConfigurationModal.Section section : List.of(
+                ModuleConfigurationModal.Section.RECENT_ACCOUNT,
+                ModuleConfigurationModal.Section.MENTION_SPAM,
+                ModuleConfigurationModal.Section.RESOURCES)) {
+            Modal modal = ModuleConfigurationModal.create(
+                    guild,
+                    antiRaid,
+                    ModuleConfigurationModal.SubmissionAction.CONFIGURE,
+                    section);
+            assertTrue(modal.getComponents().size() <= Modal.MAX_COMPONENTS);
+        }
+        for (ModuleConfigurationModal.Section section : List.of(
+                ModuleConfigurationModal.Section.TRIGGERS,
+                ModuleConfigurationModal.Section.SANCTION,
+                ModuleConfigurationModal.Section.RESOURCES)) {
+            Modal modal = ModuleConfigurationModal.create(
+                    guild,
+                    channelSanction,
+                    ModuleConfigurationModal.SubmissionAction.CONFIGURE,
+                    section);
+            assertTrue(modal.getComponents().size() <= Modal.MAX_COMPONENTS);
+        }
+    }
+
+    @Test
+    void readsTextInputsAndStringSelectsWithTheirJdaSpecificAccessors() {
+        ModalMapping textInput = mapping(
+                "timeout_seconds",
+                Component.Type.TEXT_INPUT,
+                DataObject.empty().put("value", "600"));
+        ModalMapping stringSelect = mapping(
+                "sanction_action",
+                Component.Type.STRING_SELECT,
+                DataObject.empty().put("values", DataArray.fromCollection(List.of("BAN"))));
+
+        assertEquals("600", ModuleConfigurationModal.stringValue(textInput));
+        assertEquals("BAN", ModuleConfigurationModal.stringValue(stringSelect));
+    }
+
     private static Modal createModal(Guild guild, ModuleType module) {
-        ModuleConfiguration configuration = new ModuleConfiguration(
+        ModuleConfiguration configuration = configuration(module);
+        return ModuleConfigurationModal.create(
+                guild,
+                configuration,
+                ModuleConfigurationModal.SubmissionAction.ACTIVATE);
+    }
+
+    private static ModuleConfiguration configuration(ModuleType module) {
+        return new ModuleConfiguration(
                 module,
                 ModuleStatus.DISABLED,
                 null,
                 null,
                 Map.of(),
                 Map.of());
-        return ModuleConfigurationModal.create(
-                guild,
-                configuration,
-                ModuleConfigurationModal.SubmissionAction.ACTIVATE);
     }
 
     private static Guild emptyGuild() {
@@ -131,6 +185,13 @@ class ModuleConfigurationModalTest {
                 Guild.class.getClassLoader(),
                 new Class<?>[]{Guild.class},
                 (proxy, method, arguments) -> null);
+    }
+
+    private static ModalMapping mapping(String id, Component.Type type, DataObject values) {
+        values.put("id", 1)
+                .put("custom_id", id)
+                .put("type", type.getKey());
+        return new ModalMapping(null, DataObject.empty(), values);
     }
 
     private static void assertSelectorRequirement(Modal modal, int componentIndex, boolean required) {

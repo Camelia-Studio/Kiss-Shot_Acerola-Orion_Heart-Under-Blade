@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 public class ConfigCommand implements ISlashCommand {
     private static final Logger logger = LoggerFactory.getLogger(ConfigCommand.class);
@@ -40,6 +41,11 @@ public class ConfigCommand implements ISlashCommand {
     @Override
     public DefaultMemberPermissions defaultPermissions() {
         return DefaultMemberPermissions.enabledFor(Permission.ADMINISTRATOR);
+    }
+
+    @Override
+    public Set<Permission> requiredPermissions() {
+        return Set.of(Permission.ADMINISTRATOR);
     }
 
     @Override
@@ -124,20 +130,7 @@ public class ConfigCommand implements ISlashCommand {
             Member member
     ) {
         ModuleType module = selectedModule(event);
-        if (!ModuleConfigurationModal.requiresConfigurationForActivation(module)) {
-            reply(event, service.activate(event.getGuild(), module, member.getId()).message());
-            return;
-        }
-
-        ModuleConfiguration configuration = service.find(event.getGuild(), module).orElse(null);
-        if (configuration == null) {
-            reply(event, "Configuration de module introuvable.");
-            return;
-        }
-        event.replyModal(ModuleConfigurationModal.create(
-                event.getGuild(),
-                configuration,
-                ModuleConfigurationModal.SubmissionAction.ACTIVATE)).queue();
+        reply(event, service.activate(event.getGuild(), module, member.getId()).message());
     }
 
     private OptionData moduleOption(boolean required) {

@@ -2,6 +2,7 @@ package org.camelia.studio.kiss.shot.acerola.commands.moderation;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
@@ -32,6 +33,11 @@ public class AvertoListCommand implements ISlashCommand {
     @Override
     public DefaultMemberPermissions defaultPermissions() {
         return DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS);
+    }
+
+    @Override
+    public Set<Permission> requiredPermissions() {
+        return Set.of(Permission.MODERATE_MEMBERS);
     }
 
     @Override

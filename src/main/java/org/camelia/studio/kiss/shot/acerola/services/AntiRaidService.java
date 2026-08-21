@@ -14,10 +14,16 @@ public class AntiRaidService {
     private static final Pattern USER_MENTION_PATTERN = Pattern.compile("<@!?\\d+>");
     private static final Pattern ROLE_MENTION_PATTERN = Pattern.compile("<@&\\d+>");
 
-    private final int mentionLimit;
-    private final Duration mentionWindow;
-    private final Duration minimumAccountAge;
+    private final Integer defaultMentionLimit;
+    private final Duration defaultMentionWindow;
+    private final Duration defaultMinimumAccountAge;
     private final Map<UserKey, Deque<MentionEvent>> mentionEvents = new HashMap<>();
+
+    public AntiRaidService() {
+        this.defaultMentionLimit = null;
+        this.defaultMentionWindow = null;
+        this.defaultMinimumAccountAge = null;
+    }
 
     public AntiRaidService(int mentionLimit, Duration mentionWindow, Duration minimumAccountAge) {
         if (mentionLimit <= 0) {
@@ -30,12 +36,26 @@ public class AntiRaidService {
             throw new IllegalArgumentException("minimumAccountAge must not be negative");
         }
 
-        this.mentionLimit = mentionLimit;
-        this.mentionWindow = mentionWindow;
-        this.minimumAccountAge = minimumAccountAge;
+        this.defaultMentionLimit = mentionLimit;
+        this.defaultMentionWindow = mentionWindow;
+        this.defaultMinimumAccountAge = minimumAccountAge;
     }
 
     public synchronized MentionSpamResult recordMentions(String guildId, String userId, int mentionCount, Instant occurredAt) {
+        if (defaultMentionLimit == null || defaultMentionWindow == null) {
+            throw new IllegalStateException("Les seuils anti-raid doivent être fournis par le serveur");
+        }
+        return recordMentions(guildId, userId, mentionCount, occurredAt, defaultMentionLimit, defaultMentionWindow);
+    }
+
+    public synchronized MentionSpamResult recordMentions(
+            String guildId,
+            String userId,
+            int mentionCount,
+            Instant occurredAt,
+            int mentionLimit,
+            Duration mentionWindow
+    ) {
         if (mentionCount <= 0) {
             return new MentionSpamResult(false, 0);
         }
@@ -53,10 +73,21 @@ public class AntiRaidService {
                 .mapToInt(MentionEvent::mentionCount)
                 .sum();
 
-        return new MentionSpamResult(totalMentions >= mentionLimit, totalMentions);
+        boolean thresholdReached = totalMentions >= mentionLimit;
+        if (thresholdReached) {
+            mentionEvents.remove(key);
+        }
+        return new MentionSpamResult(thresholdReached, totalMentions);
     }
 
     public boolean isAccountTooYoung(Instant accountCreatedAt, Instant now) {
+        if (defaultMinimumAccountAge == null) {
+            throw new IllegalStateException("L'âge minimum doit être fourni par le serveur");
+        }
+        return isAccountTooYoung(accountCreatedAt, now, defaultMinimumAccountAge);
+    }
+
+    public boolean isAccountTooYoung(Instant accountCreatedAt, Instant now, Duration minimumAccountAge) {
         return accountCreatedAt.plus(minimumAccountAge).isAfter(now);
     }
 

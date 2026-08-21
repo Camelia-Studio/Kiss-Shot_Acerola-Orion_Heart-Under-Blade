@@ -4,11 +4,14 @@ import org.camelia.studio.kiss.shot.acerola.db.HibernateConfig;
 import org.camelia.studio.kiss.shot.acerola.models.ConfigurationHistory;
 import org.camelia.studio.kiss.shot.acerola.models.DiscordServer;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleSetting;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.models.ServerModule;
 import org.camelia.studio.kiss.shot.acerola.models.ServerModuleChannel;
 import org.camelia.studio.kiss.shot.acerola.models.ServerModuleRole;
+import org.camelia.studio.kiss.shot.acerola.models.ServerModuleSetting;
+import org.camelia.studio.kiss.shot.acerola.models.ServerProtectedRole;
 import org.camelia.studio.kiss.shot.acerola.models.ServerSettings;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
 import org.hibernate.Session;
@@ -89,6 +92,10 @@ public class ServerConfigurationRepository {
 
             replaceRoles(session, module, candidate.roleIds());
             replaceChannels(session, module, candidate.channelIds());
+            replaceSettings(session, module, candidate.settings());
+            if (usesProtectedRoles(candidate.module())) {
+                replaceProtectedRoles(session, module.getServer(), candidate.roles(ModuleResourcePurpose.PROTECTED));
+            }
             updateLogChannel(session, discordId, candidate.logChannelId(), actorId);
             switch (status) {
                 case ACTIVE -> module.activate();
@@ -98,6 +105,7 @@ public class ServerConfigurationRepository {
 
             auditIfChanged(session, module, actorId, "roles", format(previous.roleIds()), format(candidate.roleIds()));
             auditIfChanged(session, module, actorId, "channels", format(previous.channelIds()), format(candidate.channelIds()));
+            auditIfChanged(session, module, actorId, "settings", formatSettings(previous.settings()), formatSettings(candidate.settings()));
             auditIfChanged(session, module, actorId, "status", previous.status().name(), status.name());
             auditIfChanged(
                     session,
@@ -203,6 +211,16 @@ public class ServerConfigurationRepository {
                     .add((String) row[1]);
         }
 
+        if (usesProtectedRoles(module.getModule())) {
+            Set<String> protectedRoles = new LinkedHashSet<>(session.createQuery(
+                            "SELECT resource.roleId FROM ServerProtectedRole resource " +
+                                    "WHERE resource.server.id = :serverId",
+                            String.class)
+                    .setParameter("serverId", module.getServer().getId())
+                    .getResultList());
+            roles.put(ModuleResourcePurpose.PROTECTED, protectedRoles);
+        }
+
         Map<ModuleResourcePurpose, Set<String>> channels = new EnumMap<>(ModuleResourcePurpose.class);
         for (Object[] row : session.createQuery(
                         "SELECT resource.purpose, resource.channelId FROM ServerModuleChannel resource " +
@@ -214,13 +232,24 @@ public class ServerConfigurationRepository {
                     .add((String) row[1]);
         }
 
+        Map<ModuleSetting, String> settings = new EnumMap<>(ModuleSetting.class);
+        for (Object[] row : session.createQuery(
+                        "SELECT resource.setting, resource.value FROM ServerModuleSetting resource " +
+                                "WHERE resource.serverModule.id = :moduleId",
+                        Object[].class)
+                .setParameter("moduleId", module.getId())
+                .getResultList()) {
+            settings.put((ModuleSetting) row[0], (String) row[1]);
+        }
+
         return new ModuleConfiguration(
                 module.getModule(),
                 module.getStatus(),
                 module.getSuspensionReason(),
                 logChannelId,
                 roles,
-                channels);
+                channels,
+                settings);
     }
 
     private void replaceRoles(
@@ -231,8 +260,33 @@ public class ServerConfigurationRepository {
         session.createMutationQuery("DELETE FROM ServerModuleRole WHERE serverModule.id = :moduleId")
                 .setParameter("moduleId", module.getId())
                 .executeUpdate();
-        resources.forEach((purpose, ids) -> ids.forEach(roleId ->
-                session.persist(new ServerModuleRole(module, purpose, roleId))));
+        resources.forEach((purpose, ids) -> {
+            if (purpose != ModuleResourcePurpose.PROTECTED) {
+                ids.forEach(roleId -> session.persist(new ServerModuleRole(module, purpose, roleId)));
+            }
+        });
+    }
+
+    private void replaceSettings(
+            Session session,
+            ServerModule module,
+            Map<ModuleSetting, String> settings
+    ) {
+        session.createMutationQuery("DELETE FROM ServerModuleSetting WHERE serverModule.id = :moduleId")
+                .setParameter("moduleId", module.getId())
+                .executeUpdate();
+        settings.forEach((setting, value) -> session.persist(new ServerModuleSetting(module, setting, value)));
+    }
+
+    private void replaceProtectedRoles(
+            Session session,
+            DiscordServer server,
+            Set<String> roleIds
+    ) {
+        session.createMutationQuery("DELETE FROM ServerProtectedRole WHERE server.id = :serverId")
+                .setParameter("serverId", server.getId())
+                .executeUpdate();
+        roleIds.forEach(roleId -> session.persist(new ServerProtectedRole(server, roleId)));
     }
 
     private void replaceChannels(
@@ -298,6 +352,19 @@ public class ServerConfigurationRepository {
                 .sorted(Map.Entry.comparingByKey(Comparator.naturalOrder()))
                 .map(entry -> entry.getKey().name() + "=" + entry.getValue().stream().sorted().collect(Collectors.joining(",")))
                 .collect(Collectors.joining(";"));
+    }
+
+    private String formatSettings(Map<ModuleSetting, String> settings) {
+        return settings.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.naturalOrder()))
+                .map(entry -> entry.getKey().name() + "=" + entry.getValue())
+                .collect(Collectors.joining(";"));
+    }
+
+    private boolean usesProtectedRoles(ModuleType module) {
+        return module == ModuleType.ANTI_RAID
+                || module == ModuleType.AUTO_SANCTION_CHANNEL
+                || module == ModuleType.AUTO_SANCTION_ROLE;
     }
 
     private <T> T inTransaction(TransactionWork<T> work) {

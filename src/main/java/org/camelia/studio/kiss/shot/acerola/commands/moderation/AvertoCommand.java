@@ -1,8 +1,10 @@
 package org.camelia.studio.kiss.shot.acerola.commands.moderation;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
@@ -56,6 +58,11 @@ public class AvertoCommand implements ISlashCommand {
     }
 
     @Override
+    public Set<Permission> requiredPermissions() {
+        return Set.of(Permission.MODERATE_MEMBERS);
+    }
+
+    @Override
     public Optional<ModuleType> requiredModule() {
         return Optional.of(ModuleType.WARNINGS);
     }
@@ -73,6 +80,7 @@ public class AvertoCommand implements ISlashCommand {
             OptionMapping fileOptionMapping = event.getOption("file");
             Attachment file = null;
             String fileUrl = null;
+            String proofNotice = "";
             String guildId = event.getGuild().getId();
             DiscordServer server = DiscordServerService.getInstance().register(guildId);
             GuildMessageChannel logChannel = DiscordServerService.getInstance()
@@ -86,17 +94,27 @@ public class AvertoCommand implements ISlashCommand {
 
             if (logChannel != null) {
                 File fileTemp = null;
-                if (file != null) {
-                    fileTemp = File.createTempFile("proof_" + member.getId() + "_", "." + file.getFileExtension());
-                    fileTemp = file.getProxy().downloadToFile(fileTemp).get();
-                }
+                try {
+                    if (file != null) {
+                        fileTemp = File.createTempFile("proof_" + member.getId() + "_", "." + file.getFileExtension());
+                        fileTemp = file.getProxy().downloadToFile(fileTemp).get();
+                    }
 
-                Message message = this.sendLogMessage(logChannel, member, fileTemp, reason);
+                    Message message = this.sendLogMessage(logChannel, member, fileTemp, reason);
 
-                if (fileTemp != null) {
-                    fileUrl = message.getAttachments().get(0).getUrl();
-                    fileTemp.delete();
+                    if (fileTemp != null && !message.getAttachments().isEmpty()) {
+                        fileUrl = message.getAttachments().getFirst().getUrl();
+                    }
+                } catch (Exception logError) {
+                    proofNotice = " Le salon de logs était indisponible ; la preuve n'a pas été conservée.";
+                    logger.warn("Impossible de journaliser l'avertissement sur {}", guildId, logError);
+                } finally {
+                    if (fileTemp != null) {
+                        Files.deleteIfExists(fileTemp.toPath());
+                    }
                 }
+            } else if (file != null) {
+                proofNotice = " Aucun salon de logs n'est configuré ; la preuve n'a pas été conservée.";
             }
 
             User memberUser = UserService.getInstance().getOrCreateUser(member.getId());
@@ -116,7 +134,8 @@ public class AvertoCommand implements ISlashCommand {
                         .queue(null, err -> logger.warn("Impossible d'envoyer le MP d'averto : {}", err.getMessage()));
             }, err -> logger.warn("Impossible d'ouvrir le canal privé pour l'averto : {}", err.getMessage()));
 
-            event.getHook().editOriginal("L'utilisateur %s a bien été averti !".formatted(member.getAsMention()))
+            event.getHook().editOriginal(("L'utilisateur %s a bien été averti !" + proofNotice)
+                            .formatted(member.getAsMention()))
                     .queue();
         } catch (Exception e) {
             event.getHook().editOriginal("Une erreur est survenue lors de l'avertissement, " + e.getMessage()).queue();

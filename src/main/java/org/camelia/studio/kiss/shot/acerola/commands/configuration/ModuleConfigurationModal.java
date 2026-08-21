@@ -4,6 +4,9 @@ import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu.DefaultValue;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu.SelectTarget;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
@@ -11,9 +14,12 @@ import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.interactions.modals.ModalMapping;
 import net.dv8tion.jda.api.modals.Modal;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleSetting;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
+import org.camelia.studio.kiss.shot.acerola.models.SanctionAction;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfigurationSettings;
+import org.camelia.studio.kiss.shot.acerola.services.moderation.ModerationSettings;
 
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -32,6 +38,14 @@ public final class ModuleConfigurationModal {
     private static final String WATCHED_CHANNELS = "watched_channels";
     private static final String EXCLUDED_CHANNELS = "excluded_channels";
     private static final String LOG_CHANNEL = "log_channel";
+    private static final String RULE_MODE = "rule_mode";
+    private static final String ACCOUNT_AGE_DAYS = "account_age_days";
+    private static final String MENTION_LIMIT = "mention_limit";
+    private static final String MENTION_WINDOW_SECONDS = "mention_window_seconds";
+    private static final String TIMEOUT_SECONDS = "timeout_seconds";
+    private static final String DELETE_MESSAGE = "delete_message";
+    private static final String SANCTION_ACTION = "sanction_action";
+    private static final String BAN_HISTORY_DAYS = "ban_history_days";
     private static final int MAX_SELECTIONS = 25;
 
     private ModuleConfigurationModal() {
@@ -57,13 +71,26 @@ public final class ModuleConfigurationModal {
             ModuleConfiguration configuration,
             SubmissionAction action
     ) {
-        ModuleType module = configuration.module();
-        Modal.Builder modal = Modal.create(
-                MODAL_PREFIX + action.id() + ":" + module.name(),
-                "Configurer " + label(module));
+        return create(guild, configuration, action, defaultSection(configuration.module()));
+    }
 
-        switch (module) {
-            case AUTO_ROLE -> modal.addComponents(roleSelector(
+    public static Modal create(
+            Guild guild,
+            ModuleConfiguration configuration,
+            SubmissionAction action,
+            Section section
+    ) {
+        ModuleType module = configuration.module();
+        if (!supportsSection(module, section)) {
+            throw new IllegalArgumentException("Section de configuration incompatible avec ce module");
+        }
+        Modal.Builder modal = Modal.create(
+                MODAL_PREFIX + action.id() + ":" + module.name() + ":" + section.name(),
+                modalTitle(module, section));
+
+        switch (section) {
+            case DEFAULT -> {
+                if (module == ModuleType.AUTO_ROLE) modal.addComponents(roleSelector(
                     guild,
                     TARGET_ROLE,
                     "Rôle à attribuer",
@@ -71,7 +98,7 @@ public final class ModuleConfigurationModal {
                     configuration.roles(ModuleResourcePurpose.TARGET),
                     true,
                     1));
-            case INTEGRATION_REMOVAL -> modal.addComponents(channelSelector(
+                else if (module == ModuleType.INTEGRATION_REMOVAL) modal.addComponents(channelSelector(
                     guild,
                     WATCHED_CHANNELS,
                     "Salons surveillés",
@@ -79,7 +106,7 @@ public final class ModuleConfigurationModal {
                     configuration.channels(ModuleResourcePurpose.WATCHED),
                     true,
                     MAX_SELECTIONS));
-            case LINK_ENRICHMENT -> modal.addComponents(channelSelector(
+                else if (module == ModuleType.LINK_ENRICHMENT) modal.addComponents(channelSelector(
                     guild,
                     EXCLUDED_CHANNELS,
                     "Salons exclus (facultatif)",
@@ -87,32 +114,33 @@ public final class ModuleConfigurationModal {
                     configuration.channels(ModuleResourcePurpose.EXCLUDED),
                     false,
                     MAX_SELECTIONS));
-            case ANTI_RAID -> modal.addComponents(
+                else throw new IllegalArgumentException("Section de configuration incompatible avec ce module");
+            }
+            case RESOURCES -> modal.addComponents(
                     logChannelSelector(guild, configuration.logChannelId()),
                     protectedRolesSelector(guild, configuration));
-            case AUTO_SANCTION_CHANNEL -> modal.addComponents(
-                    logChannelSelector(guild, configuration.logChannelId()),
-                    channelSelector(
+            case TRIGGERS -> {
+                if (module == ModuleType.AUTO_SANCTION_CHANNEL) modal.addComponents(channelSelector(
                             guild,
                             WATCHED_CHANNELS,
                             "Salons déclencheurs",
                             "Un message dans l'un de ces salons déclenche la sanction.",
                             configuration.channels(ModuleResourcePurpose.WATCHED),
                             true,
-                            MAX_SELECTIONS),
-                    protectedRolesSelector(guild, configuration));
-            case AUTO_SANCTION_ROLE -> modal.addComponents(
-                    logChannelSelector(guild, configuration.logChannelId()),
-                    roleSelector(
+                            MAX_SELECTIONS));
+                else if (module == ModuleType.AUTO_SANCTION_ROLE) modal.addComponents(roleSelector(
                             guild,
                             WATCHED_ROLES,
                             "Rôles déclencheurs",
                             "L'obtention de l'un de ces rôles déclenche la sanction.",
                             configuration.roles(ModuleResourcePurpose.WATCHED),
                             true,
-                            MAX_SELECTIONS),
-                    protectedRolesSelector(guild, configuration));
-            default -> throw new IllegalArgumentException("Ce module ne nécessite aucune modale de configuration");
+                            MAX_SELECTIONS));
+                else throw new IllegalArgumentException("Section de déclencheurs incompatible avec ce module");
+            }
+            case RECENT_ACCOUNT -> addRecentAccountSettings(modal, configuration);
+            case MENTION_SPAM -> addMentionSpamSettings(modal, configuration);
+            case SANCTION -> addSanctionSettings(modal, configuration);
         }
 
         return modal.build();
@@ -122,15 +150,16 @@ public final class ModuleConfigurationModal {
         if (modalId == null || !modalId.startsWith(MODAL_PREFIX)) {
             return Optional.empty();
         }
-        String[] parts = modalId.substring(MODAL_PREFIX.length()).split(":", 2);
-        if (parts.length != 2) {
+        String[] parts = modalId.substring(MODAL_PREFIX.length()).split(":", 3);
+        if (parts.length < 2) {
             return Optional.empty();
         }
         try {
             SubmissionAction action = SubmissionAction.fromId(parts[0]);
             ModuleType module = ModuleType.valueOf(parts[1]);
-            return hasEditableSettings(module)
-                    ? Optional.of(new Submission(action, module))
+            Section section = parts.length == 3 ? Section.valueOf(parts[2]) : defaultSection(module);
+            return hasEditableSettings(module) && supportsSection(module, section)
+                    ? Optional.of(new Submission(action, module, section))
                     : Optional.empty();
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
@@ -138,36 +167,330 @@ public final class ModuleConfigurationModal {
     }
 
     public static ModuleConfigurationSettings settingsFrom(ModalInteractionEvent event, ModuleType module) {
+        return settingsFrom(event, module, defaultSection(module));
+    }
+
+    public static ModuleConfigurationSettings settingsFrom(
+            ModalInteractionEvent event,
+            ModuleType module,
+            Section section
+    ) {
+        if (!supportsSection(module, section)) {
+            throw new IllegalArgumentException("Section de configuration incompatible avec ce module");
+        }
         Map<ModuleResourcePurpose, Set<String>> roles = new EnumMap<>(ModuleResourcePurpose.class);
         Map<ModuleResourcePurpose, Set<String>> channels = new EnumMap<>(ModuleResourcePurpose.class);
         String logChannelId = null;
 
-        switch (module) {
-            case AUTO_ROLE -> roles.put(ModuleResourcePurpose.TARGET, selectedRoleIds(event, TARGET_ROLE));
-            case INTEGRATION_REMOVAL -> channels.put(
+        Map<ModuleSetting, String> settings = Map.of();
+
+        switch (section) {
+            case DEFAULT -> {
+                if (module == ModuleType.AUTO_ROLE) roles.put(
+                        ModuleResourcePurpose.TARGET,
+                        selectedRoleIds(event, TARGET_ROLE));
+                else if (module == ModuleType.INTEGRATION_REMOVAL) channels.put(
                     ModuleResourcePurpose.WATCHED,
                     selectedChannelIds(event, WATCHED_CHANNELS));
-            case LINK_ENRICHMENT -> channels.put(
+                else if (module == ModuleType.LINK_ENRICHMENT) channels.put(
                     ModuleResourcePurpose.EXCLUDED,
                     selectedChannelIds(event, EXCLUDED_CHANNELS));
-            case ANTI_RAID -> {
+                else throw new IllegalArgumentException("Section de configuration incompatible avec ce module");
+            }
+            case RESOURCES -> {
                 logChannelId = selectedChannelId(event, LOG_CHANNEL);
                 roles.put(ModuleResourcePurpose.PROTECTED, selectedRoleIds(event, PROTECTED_ROLES));
             }
-            case AUTO_SANCTION_CHANNEL -> {
-                logChannelId = selectedChannelId(event, LOG_CHANNEL);
-                channels.put(ModuleResourcePurpose.WATCHED, selectedChannelIds(event, WATCHED_CHANNELS));
-                roles.put(ModuleResourcePurpose.PROTECTED, selectedRoleIds(event, PROTECTED_ROLES));
+            case TRIGGERS -> {
+                if (module == ModuleType.AUTO_SANCTION_CHANNEL) channels.put(
+                        ModuleResourcePurpose.WATCHED,
+                        selectedChannelIds(event, WATCHED_CHANNELS));
+                else if (module == ModuleType.AUTO_SANCTION_ROLE) roles.put(
+                        ModuleResourcePurpose.WATCHED,
+                        selectedRoleIds(event, WATCHED_ROLES));
+                else throw new IllegalArgumentException("Section de déclencheurs incompatible avec ce module");
             }
-            case AUTO_SANCTION_ROLE -> {
-                logChannelId = selectedChannelId(event, LOG_CHANNEL);
-                roles.put(ModuleResourcePurpose.WATCHED, selectedRoleIds(event, WATCHED_ROLES));
-                roles.put(ModuleResourcePurpose.PROTECTED, selectedRoleIds(event, PROTECTED_ROLES));
-            }
-            default -> throw new IllegalArgumentException("Ce module ne nécessite aucune configuration");
+            case RECENT_ACCOUNT -> settings = recentAccountSettings(event);
+            case MENTION_SPAM -> settings = mentionSpamSettings(event);
+            case SANCTION -> settings = sanctionSettings(event, module);
         }
 
-        return new ModuleConfigurationSettings(logChannelId, roles, channels);
+        return new ModuleConfigurationSettings(logChannelId, roles, channels, settings);
+    }
+
+    private static void addRecentAccountSettings(Modal.Builder modal, ModuleConfiguration configuration) {
+        ModerationSettings.AntiRaid settings = ModerationSettings.antiRaid(configuration);
+        modal.addComponents(
+                ruleModeSelector(settings.recentAccountEnabled(), settings.recentAccountAction()),
+                numberInput(
+                        ACCOUNT_AGE_DAYS,
+                        "Âge maximal du compte (jours)",
+                        "Les comptes plus récents déclenchent la règle.",
+                        settings.recentAccountMaximumAgeDays(),
+                        true),
+                numberInput(
+                        TIMEOUT_SECONDS,
+                        "Durée d'exclusion (secondes)",
+                        "Obligatoire uniquement pour une exclusion temporaire.",
+                        Math.toIntExact(settings.recentAccountTimeout().toSeconds()),
+                        false));
+    }
+
+    private static void addMentionSpamSettings(Modal.Builder modal, ModuleConfiguration configuration) {
+        ModerationSettings.AntiRaid settings = ModerationSettings.antiRaid(configuration);
+        modal.addComponents(
+                ruleModeSelector(settings.mentionSpamEnabled(), settings.mentionAction()),
+                numberInput(
+                        MENTION_LIMIT,
+                        "Nombre de mentions",
+                        "Nombre cumulé qui déclenche la règle.",
+                        settings.mentionLimit(),
+                        true),
+                numberInput(
+                        MENTION_WINDOW_SECONDS,
+                        "Fenêtre de détection (secondes)",
+                        "Les mentions sont cumulées dans cette fenêtre.",
+                        Math.toIntExact(settings.mentionWindow().toSeconds()),
+                        true),
+                numberInput(
+                        TIMEOUT_SECONDS,
+                        "Durée d'exclusion (secondes)",
+                        "Obligatoire uniquement pour une exclusion temporaire.",
+                        Math.toIntExact(settings.mentionTimeout().toSeconds()),
+                        false),
+                booleanSelector(
+                        DELETE_MESSAGE,
+                        "Suppression du message",
+                        "Supprimer le message qui atteint le seuil.",
+                        settings.deleteMentionMessage()));
+    }
+
+    private static void addSanctionSettings(Modal.Builder modal, ModuleConfiguration configuration) {
+        ModerationSettings.AutomaticSanction settings = ModerationSettings.automaticSanction(configuration);
+        modal.addComponents(
+                actionSelector(settings.action().orElse(null)),
+                numberInput(
+                        TIMEOUT_SECONDS,
+                        "Durée d'exclusion (secondes)",
+                        "Obligatoire uniquement pour une exclusion temporaire.",
+                        Math.toIntExact(settings.timeout().toSeconds()),
+                        false),
+                numberInput(
+                        BAN_HISTORY_DAYS,
+                        "Historique supprimé (jours)",
+                        "De 0 à 7 jours lors d'un bannissement.",
+                        settings.banHistoryDays(),
+                        true));
+        if (configuration.module() == ModuleType.AUTO_SANCTION_CHANNEL) {
+            modal.addComponents(booleanSelector(
+                    DELETE_MESSAGE,
+                    "Suppression du message",
+                    "Supprimer le message qui déclenche la règle.",
+                    settings.deleteMessage()));
+        }
+    }
+
+    private static Map<ModuleSetting, String> recentAccountSettings(ModalInteractionEvent event) {
+        RuleMode mode = selectedRuleMode(event);
+        int ageDays = positiveInt(event, ACCOUNT_AGE_DAYS, "L'âge maximal du compte");
+        int timeoutSeconds = timeoutSeconds(event, mode.action());
+        return ModerationSettings.recentAccountValues(mode.enabled(), ageDays, mode.action(), timeoutSeconds);
+    }
+
+    private static Map<ModuleSetting, String> mentionSpamSettings(ModalInteractionEvent event) {
+        RuleMode mode = selectedRuleMode(event);
+        int mentionLimit = positiveInt(event, MENTION_LIMIT, "Le nombre de mentions");
+        int windowSeconds = positiveInt(event, MENTION_WINDOW_SECONDS, "La fenêtre de détection");
+        int timeoutSeconds = timeoutSeconds(event, mode.action());
+        boolean deleteMessage = Boolean.parseBoolean(selectedString(event, DELETE_MESSAGE));
+        return ModerationSettings.mentionSpamValues(
+                mode.enabled(),
+                mentionLimit,
+                windowSeconds,
+                mode.action(),
+                timeoutSeconds,
+                deleteMessage);
+    }
+
+    private static Map<ModuleSetting, String> sanctionSettings(
+            ModalInteractionEvent event,
+            ModuleType module
+    ) {
+        SanctionAction action = SanctionAction.valueOf(selectedString(event, SANCTION_ACTION));
+        int timeoutSeconds = timeoutSeconds(event, action);
+        int historyDays = nonNegativeInt(event, BAN_HISTORY_DAYS, "La durée d'historique supprimé");
+        if (historyDays > ModerationSettings.MAX_BAN_HISTORY_DAYS) {
+            throw new IllegalArgumentException("L'historique supprimé est limité à 7 jours.");
+        }
+        boolean deleteMessage = module == ModuleType.AUTO_SANCTION_CHANNEL
+                && Boolean.parseBoolean(selectedString(event, DELETE_MESSAGE));
+        return ModerationSettings.automaticSanctionValues(action, timeoutSeconds, historyDays, deleteMessage);
+    }
+
+    private static int timeoutSeconds(ModalInteractionEvent event, SanctionAction action) {
+        String raw = optionalString(event, TIMEOUT_SECONDS);
+        if (raw.isBlank()) {
+            if (action == SanctionAction.TIMEOUT) {
+                throw new IllegalArgumentException("La durée d'exclusion est obligatoire pour cette action.");
+            }
+            return 600;
+        }
+        int seconds = parseInt(raw, "La durée d'exclusion");
+        if (seconds <= 0 || seconds > ModerationSettings.MAX_TIMEOUT_SECONDS) {
+            throw new IllegalArgumentException("La durée d'exclusion doit être comprise entre 1 seconde et 28 jours.");
+        }
+        return seconds;
+    }
+
+    private static int positiveInt(ModalInteractionEvent event, String id, String label) {
+        int value = parseInt(selectedString(event, id), label);
+        if (value <= 0) {
+            throw new IllegalArgumentException(label + " doit être positif.");
+        }
+        return value;
+    }
+
+    private static int nonNegativeInt(ModalInteractionEvent event, String id, String label) {
+        int value = parseInt(selectedString(event, id), label);
+        if (value < 0) {
+            throw new IllegalArgumentException(label + " ne peut pas être négatif.");
+        }
+        return value;
+    }
+
+    private static int parseInt(String raw, String label) {
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(label + " doit être un nombre entier.");
+        }
+    }
+
+    private static RuleMode selectedRuleMode(ModalInteractionEvent event) {
+        String raw = selectedString(event, RULE_MODE);
+        if (raw.startsWith("DISABLED_")) {
+            return new RuleMode(false, SanctionAction.valueOf(raw.substring("DISABLED_".length())));
+        }
+        return new RuleMode(true, SanctionAction.valueOf(raw));
+    }
+
+    private static Label ruleModeSelector(boolean enabled, SanctionAction action) {
+        String disabledValue = "DISABLED_" + action.name();
+        StringSelectMenu menu = actionOptions(StringSelectMenu.create(RULE_MODE))
+                .addOption("Désactivée", disabledValue)
+                .setRequiredRange(1, 1)
+                .setDefaultValues(enabled ? action.name() : disabledValue)
+                .build();
+        return Label.of("État et action", "Activez la règle et choisissez son action.", menu);
+    }
+
+    private static Label actionSelector(SanctionAction current) {
+        StringSelectMenu.Builder builder = actionOptions(StringSelectMenu.create(SANCTION_ACTION))
+                .setRequiredRange(1, 1);
+        if (current != null) {
+            builder.setDefaultValues(current.name());
+        }
+        return Label.of(
+                "Action",
+                "Choisissez explicitement l'action appliquée.",
+                builder.build());
+    }
+
+    private static StringSelectMenu.Builder actionOptions(StringSelectMenu.Builder builder) {
+        return builder
+                .addOption("Journalisation uniquement", SanctionAction.LOG_ONLY.name())
+                .addOption("Exclusion temporaire", SanctionAction.TIMEOUT.name())
+                .addOption("Expulsion", SanctionAction.KICK.name())
+                .addOption("Bannissement", SanctionAction.BAN.name());
+    }
+
+    private static Label booleanSelector(
+            String id,
+            String title,
+            String description,
+            boolean current
+    ) {
+        StringSelectMenu menu = StringSelectMenu.create(id)
+                .addOption("Oui", "true")
+                .addOption("Non", "false")
+                .setRequiredRange(1, 1)
+                .setDefaultValues(String.valueOf(current))
+                .build();
+        return Label.of(title, description, menu);
+    }
+
+    private static Label numberInput(
+            String id,
+            String title,
+            String description,
+            int current,
+            boolean required
+    ) {
+        TextInput input = TextInput.create(id, TextInputStyle.SHORT)
+                .setRequired(required)
+                .setMaxLength(10)
+                .setValue(String.valueOf(current))
+                .build();
+        return Label.of(title, description, input);
+    }
+
+    private static String selectedString(ModalInteractionEvent event, String id) {
+        String value = optionalString(event, id);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("Un réglage obligatoire est manquant.");
+        }
+        return value;
+    }
+
+    private static String optionalString(ModalInteractionEvent event, String id) {
+        ModalMapping value = event.getValue(id);
+        return value == null ? "" : stringValue(value);
+    }
+
+    static String stringValue(ModalMapping value) {
+        return switch (value.getType()) {
+            case TEXT_INPUT -> {
+                String text = value.getAsOptionalString();
+                yield text == null ? "" : text;
+            }
+            case STRING_SELECT -> value.getAsStringList().stream().findFirst().orElse("");
+            default -> throw new IllegalArgumentException(
+                    "Le composant " + value.getCustomId() + " ne contient pas une valeur textuelle compatible.");
+        };
+    }
+
+    private static Section defaultSection(ModuleType module) {
+        return switch (module) {
+            case ANTI_RAID, AUTO_SANCTION_CHANNEL, AUTO_SANCTION_ROLE -> Section.RESOURCES;
+            default -> Section.DEFAULT;
+        };
+    }
+
+    private static boolean supportsSection(ModuleType module, Section section) {
+        return switch (section) {
+            case DEFAULT -> module == ModuleType.AUTO_ROLE
+                    || module == ModuleType.INTEGRATION_REMOVAL
+                    || module == ModuleType.LINK_ENRICHMENT;
+            case RESOURCES -> module == ModuleType.ANTI_RAID
+                    || module == ModuleType.AUTO_SANCTION_CHANNEL
+                    || module == ModuleType.AUTO_SANCTION_ROLE;
+            case TRIGGERS -> module == ModuleType.AUTO_SANCTION_CHANNEL
+                    || module == ModuleType.AUTO_SANCTION_ROLE;
+            case RECENT_ACCOUNT, MENTION_SPAM -> module == ModuleType.ANTI_RAID;
+            case SANCTION -> module == ModuleType.AUTO_SANCTION_CHANNEL
+                    || module == ModuleType.AUTO_SANCTION_ROLE;
+        };
+    }
+
+    private static String modalTitle(ModuleType module, Section section) {
+        return switch (section) {
+            case DEFAULT -> "Configurer " + label(module);
+            case RESOURCES -> "Ressources de modération";
+            case TRIGGERS -> "Configurer les déclencheurs";
+            case RECENT_ACCOUNT -> "Règle des comptes récents";
+            case MENTION_SPAM -> "Règle du spam de mentions";
+            case SANCTION -> "Configurer l'action";
+        };
     }
 
     public static String label(ModuleType module) {
@@ -305,6 +628,18 @@ public final class ModuleConfigurationModal {
         }
     }
 
-    public record Submission(SubmissionAction action, ModuleType module) {
+    public enum Section {
+        DEFAULT,
+        RESOURCES,
+        TRIGGERS,
+        RECENT_ACCOUNT,
+        MENTION_SPAM,
+        SANCTION
+    }
+
+    private record RuleMode(boolean enabled, SanctionAction action) {
+    }
+
+    public record Submission(SubmissionAction action, ModuleType module, Section section) {
     }
 }

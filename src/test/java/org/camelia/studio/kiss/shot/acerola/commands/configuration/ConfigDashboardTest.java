@@ -33,7 +33,9 @@ class ConfigDashboardTest {
 
         assertEquals(ModuleType.values().length, selector.getOptions().size());
         assertEquals(1, selector.getOptions().stream().filter(option -> option.isDefault()).count());
-        assertEquals(List.of("Configurer", "Désactiver"), buttons.stream().map(Button::getLabel).toList());
+        assertEquals(
+                List.of("Configurer", "Rattraper", "Désactiver"),
+                buttons.stream().map(Button::getLabel).toList());
     }
 
     @Test
@@ -47,19 +49,21 @@ class ConfigDashboardTest {
                 .map(Button::getLabel)
                 .toList();
 
-        assertEquals(List.of("Configurer", "Revalider", "Désactiver"), labels);
+        assertEquals(
+                List.of("Déclencheurs", "Action", "Ressources", "Revalider", "Désactiver"),
+                labels);
         assertEquals("Réglages enregistrés", view.embed().getFooter().getText());
     }
 
     @Test
-    void disabledModuleActivatesWithoutAnExtraConfigurationButton() {
+    void disabledModuleCanBeConfiguredBeforeActivation() {
         ConfigDashboard.View view = ConfigDashboard.create(
                 configurations(ModuleType.AUTO_ROLE, ModuleStatus.DISABLED),
                 ModuleType.AUTO_ROLE,
                 null);
 
         assertEquals(
-                List.of("Activer"),
+                List.of("Configurer", "Activer"),
                 view.components().get(1).getButtons().stream().map(Button::getLabel).toList());
     }
 
@@ -106,6 +110,17 @@ class ConfigDashboardTest {
 
         assertEquals(
                 List.of("Confirmer la désactivation", "Annuler"),
+                view.components().get(1).getButtons().stream().map(Button::getLabel).toList());
+    }
+
+    @Test
+    void autoRoleCatchUpRequiresExplicitConfirmation() {
+        ConfigDashboard.View view = ConfigDashboard.confirmAutoRoleCatchUp(
+                configurations(ModuleType.AUTO_ROLE, ModuleStatus.ACTIVE),
+                ModuleType.AUTO_ROLE);
+
+        assertEquals(
+                List.of("Confirmer le rattrapage", "Annuler"),
                 view.components().get(1).getButtons().stream().map(Button::getLabel).toList());
     }
 
