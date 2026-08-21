@@ -90,14 +90,14 @@ public class ModuleConfigurationService {
             ModuleType module,
             String actorId
     ) {
-        return activate(guild, module, actorId, ModuleActivationSettings.empty());
+        return activate(guild, module, actorId, ModuleConfigurationSettings.empty());
     }
 
     public synchronized ConfigurationOperationResult activate(
             Guild guild,
             ModuleType module,
             String actorId,
-            ModuleActivationSettings settings
+            ModuleConfigurationSettings settings
     ) {
         ModuleConfiguration current = loadFresh(guild, module).orElse(null);
         if (current == null) {
@@ -117,6 +117,55 @@ public class ModuleConfigurationService {
         }
         cache.put(new CacheKey(guild.getId(), module), active);
         return ConfigurationOperationResult.success("Le module est maintenant actif.");
+    }
+
+    public synchronized ConfigurationOperationResult configure(
+            Guild guild,
+            ModuleType module,
+            String actorId,
+            ModuleConfigurationSettings settings
+    ) {
+        ModuleConfiguration current = loadFresh(guild, module).orElse(null);
+        if (current == null) {
+            return ConfigurationOperationResult.failure("Configuration de module introuvable.");
+        }
+
+        ModuleConfiguration candidate = settings.applyTo(current);
+        ModuleStatus status = current.status();
+        String suspensionReason = current.suspensionReason();
+        ModuleValidationResult validation = validator.validate(guild, candidate);
+        boolean suspendedByChange = false;
+        if (status == ModuleStatus.ACTIVE && !validation.valid()) {
+            status = ModuleStatus.SUSPENDED;
+            suspensionReason = validation.reason();
+            suspendedByChange = true;
+        }
+
+        ModuleConfiguration configured = repository.configure(
+                guild.getId(),
+                candidate,
+                status,
+                suspensionReason,
+                actorId);
+        if (!Objects.equals(current.logChannelId(), candidate.logChannelId())) {
+            cache.keySet().removeIf(key -> key.guildId().equals(guild.getId()));
+        }
+        cache.put(new CacheKey(guild.getId(), module), configured);
+
+        if (suspendedByChange) {
+            return ConfigurationOperationResult.success(
+                    "Les réglages sont enregistrés. Le module a été suspendu : "
+                            + configured.suspensionReason() + ".");
+        }
+        return switch (configured.status()) {
+            case ACTIVE -> ConfigurationOperationResult.success(
+                    "Les réglages sont enregistrés. Le module reste actif.");
+            case DISABLED -> ConfigurationOperationResult.success(
+                    "Les réglages sont enregistrés. Le module reste désactivé.");
+            case SUSPENDED -> ConfigurationOperationResult.success(
+                    "Les réglages sont enregistrés. Le module reste suspendu : "
+                            + configured.suspensionReason() + ". Relancez sa validation.");
+        };
     }
 
     public synchronized ConfigurationOperationResult disable(

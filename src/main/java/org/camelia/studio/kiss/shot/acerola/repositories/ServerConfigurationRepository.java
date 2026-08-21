@@ -58,6 +58,31 @@ public class ServerConfigurationRepository {
             ModuleConfiguration candidate,
             String actorId
     ) {
+        return saveConfiguration(
+                discordId,
+                candidate,
+                ModuleStatus.ACTIVE,
+                null,
+                actorId);
+    }
+
+    public ModuleConfiguration configure(
+            String discordId,
+            ModuleConfiguration candidate,
+            ModuleStatus status,
+            String suspensionReason,
+            String actorId
+    ) {
+        return saveConfiguration(discordId, candidate, status, suspensionReason, actorId);
+    }
+
+    private ModuleConfiguration saveConfiguration(
+            String discordId,
+            ModuleConfiguration candidate,
+            ModuleStatus status,
+            String suspensionReason,
+            String actorId
+    ) {
         return inTransaction(session -> {
             ServerModule module = requireModule(session, discordId, candidate.module());
             ModuleConfiguration previous = toConfiguration(session, module);
@@ -65,16 +90,27 @@ public class ServerConfigurationRepository {
             replaceRoles(session, module, candidate.roleIds());
             replaceChannels(session, module, candidate.channelIds());
             updateLogChannel(session, discordId, candidate.logChannelId(), actorId);
-            module.activate();
+            switch (status) {
+                case ACTIVE -> module.activate();
+                case DISABLED -> module.disable();
+                case SUSPENDED -> module.suspend(suspensionReason);
+            }
 
             auditIfChanged(session, module, actorId, "roles", format(previous.roleIds()), format(candidate.roleIds()));
             auditIfChanged(session, module, actorId, "channels", format(previous.channelIds()), format(candidate.channelIds()));
-            auditIfChanged(session, module, actorId, "status", previous.status().name(), ModuleStatus.ACTIVE.name());
+            auditIfChanged(session, module, actorId, "status", previous.status().name(), status.name());
+            auditIfChanged(
+                    session,
+                    module,
+                    actorId,
+                    "suspension_reason",
+                    previous.suspensionReason(),
+                    suspensionReason);
 
             return new ModuleConfiguration(
                     candidate.module(),
-                    ModuleStatus.ACTIVE,
-                    null,
+                    status,
+                    suspensionReason,
                     candidate.logChannelId(),
                     candidate.roleIds(),
                     candidate.channelIds());

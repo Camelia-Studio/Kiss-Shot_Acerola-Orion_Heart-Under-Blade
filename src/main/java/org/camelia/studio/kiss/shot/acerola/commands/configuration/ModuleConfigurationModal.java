@@ -13,9 +13,10 @@ import net.dv8tion.jda.api.interactions.modals.ModalMapping;
 import net.dv8tion.jda.api.modals.Modal;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
-import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleActivationSettings;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
+import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfigurationSettings;
 
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -24,19 +25,20 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public final class ModuleActivationModal {
-    private static final String MODAL_PREFIX = "config:activate:";
+public final class ModuleConfigurationModal {
+    private static final String MODAL_PREFIX = "config:";
     private static final String TARGET_ROLE = "target_role";
     private static final String WATCHED_ROLES = "watched_roles";
     private static final String PROTECTED_ROLES = "protected_roles";
     private static final String WATCHED_CHANNELS = "watched_channels";
+    private static final String EXCLUDED_CHANNELS = "excluded_channels";
     private static final String LOG_CHANNEL = "log_channel";
     private static final int MAX_SELECTIONS = 25;
 
-    private ModuleActivationModal() {
+    private ModuleConfigurationModal() {
     }
 
-    public static boolean requiresConfiguration(ModuleType module) {
+    public static boolean requiresConfigurationForActivation(ModuleType module) {
         return switch (module) {
             case AUTO_ROLE,
                  INTEGRATION_REMOVAL,
@@ -47,9 +49,19 @@ public final class ModuleActivationModal {
         };
     }
 
-    public static Modal create(Guild guild, ModuleConfiguration configuration) {
+    public static boolean hasEditableSettings(ModuleType module) {
+        return module == ModuleType.LINK_ENRICHMENT || requiresConfigurationForActivation(module);
+    }
+
+    public static Modal create(
+            Guild guild,
+            ModuleConfiguration configuration,
+            SubmissionAction action
+    ) {
         ModuleType module = configuration.module();
-        Modal.Builder modal = Modal.create(MODAL_PREFIX + module.name(), "Configurer " + label(module));
+        Modal.Builder modal = Modal.create(
+                MODAL_PREFIX + action.id() + ":" + module.name(),
+                "Configurer " + label(module));
 
         switch (module) {
             case AUTO_ROLE -> modal.addComponents(roleSelector(
@@ -67,6 +79,14 @@ public final class ModuleActivationModal {
                     "Choisissez les salons où les intégrations seront supprimées.",
                     configuration.channels(ModuleResourcePurpose.WATCHED),
                     true,
+                    MAX_SELECTIONS));
+            case LINK_ENRICHMENT -> modal.addComponents(channelSelector(
+                    guild,
+                    EXCLUDED_CHANNELS,
+                    "Salons exclus (facultatif)",
+                    "Les liens publiés dans ces salons ne seront pas enrichis.",
+                    configuration.channels(ModuleResourcePurpose.EXCLUDED),
+                    false,
                     MAX_SELECTIONS));
             case ANTI_RAID -> modal.addComponents(
                     logChannelSelector(guild, configuration.logChannelId()),
@@ -99,19 +119,26 @@ public final class ModuleActivationModal {
         return modal.build();
     }
 
-    public static Optional<ModuleType> moduleFrom(String modalId) {
+    public static Optional<Submission> submissionFrom(String modalId) {
         if (modalId == null || !modalId.startsWith(MODAL_PREFIX)) {
             return Optional.empty();
         }
+        String[] parts = modalId.substring(MODAL_PREFIX.length()).split(":", 2);
+        if (parts.length != 2) {
+            return Optional.empty();
+        }
         try {
-            ModuleType module = ModuleType.valueOf(modalId.substring(MODAL_PREFIX.length()));
-            return requiresConfiguration(module) ? Optional.of(module) : Optional.empty();
+            SubmissionAction action = SubmissionAction.fromId(parts[0]);
+            ModuleType module = ModuleType.valueOf(parts[1]);
+            return hasEditableSettings(module)
+                    ? Optional.of(new Submission(action, module))
+                    : Optional.empty();
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
     }
 
-    public static ModuleActivationSettings settingsFrom(ModalInteractionEvent event, ModuleType module) {
+    public static ModuleConfigurationSettings settingsFrom(ModalInteractionEvent event, ModuleType module) {
         Map<ModuleResourcePurpose, Set<String>> roles = new EnumMap<>(ModuleResourcePurpose.class);
         Map<ModuleResourcePurpose, Set<String>> channels = new EnumMap<>(ModuleResourcePurpose.class);
         String logChannelId = null;
@@ -121,6 +148,9 @@ public final class ModuleActivationModal {
             case INTEGRATION_REMOVAL -> channels.put(
                     ModuleResourcePurpose.WATCHED,
                     selectedChannelIds(event, WATCHED_CHANNELS));
+            case LINK_ENRICHMENT -> channels.put(
+                    ModuleResourcePurpose.EXCLUDED,
+                    selectedChannelIds(event, EXCLUDED_CHANNELS));
             case ANTI_RAID -> {
                 logChannelId = selectedChannelId(event, LOG_CHANNEL);
                 roles.put(ModuleResourcePurpose.PROTECTED, selectedRoleIds(event, PROTECTED_ROLES));
@@ -138,7 +168,7 @@ public final class ModuleActivationModal {
             default -> throw new IllegalArgumentException("Ce module ne nécessite aucune configuration");
         }
 
-        return new ModuleActivationSettings(logChannelId, roles, channels);
+        return new ModuleConfigurationSettings(logChannelId, roles, channels);
     }
 
     public static String label(ModuleType module) {
@@ -250,5 +280,30 @@ public final class ModuleActivationModal {
 
     private static String selectedChannelId(ModalInteractionEvent event, String id) {
         return selectedChannelIds(event, id).stream().findFirst().orElse(null);
+    }
+
+    public enum SubmissionAction {
+        ACTIVATE("activate"),
+        CONFIGURE("configure");
+
+        private final String id;
+
+        SubmissionAction(String id) {
+            this.id = id;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        private static SubmissionAction fromId(String id) {
+            return Arrays.stream(values())
+                    .filter(action -> action.id.equals(id))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Action de modale inconnue"));
+        }
+    }
+
+    public record Submission(SubmissionAction action, ModuleType module) {
     }
 }

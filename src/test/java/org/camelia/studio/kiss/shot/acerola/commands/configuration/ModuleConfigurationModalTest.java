@@ -14,13 +14,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ModuleActivationModalTest {
+class ModuleConfigurationModalTest {
     @Test
     void onlyModulesWithRequiredResourcesOpenAModal() {
         Set<ModuleType> modules = Stream.of(ModuleType.values())
-                .filter(ModuleActivationModal::requiresConfiguration)
+                .filter(ModuleConfigurationModal::requiresConfigurationForActivation)
                 .collect(Collectors.toUnmodifiableSet());
 
         assertEquals(Set.of(
@@ -32,12 +33,25 @@ class ModuleActivationModalTest {
     }
 
     @Test
+    void optionalLinkSettingsAreEditableWithoutBlockingActivation() {
+        assertTrue(ModuleConfigurationModal.hasEditableSettings(ModuleType.LINK_ENRICHMENT));
+        assertFalse(ModuleConfigurationModal.requiresConfigurationForActivation(ModuleType.LINK_ENRICHMENT));
+    }
+
+    @Test
     void modalIdResolvesItsConfiguredModule() {
         assertEquals(
                 ModuleType.AUTO_ROLE,
-                ModuleActivationModal.moduleFrom("config:activate:AUTO_ROLE").orElseThrow());
-        assertTrue(ModuleActivationModal.moduleFrom("config:activate:MUSIC").isEmpty());
-        assertTrue(ModuleActivationModal.moduleFrom("another-modal").isEmpty());
+                ModuleConfigurationModal.submissionFrom("config:activate:AUTO_ROLE")
+                        .orElseThrow()
+                        .module());
+        assertEquals(
+                ModuleConfigurationModal.SubmissionAction.CONFIGURE,
+                ModuleConfigurationModal.submissionFrom("config:configure:AUTO_ROLE")
+                        .orElseThrow()
+                        .action());
+        assertTrue(ModuleConfigurationModal.submissionFrom("config:activate:MUSIC").isEmpty());
+        assertTrue(ModuleConfigurationModal.submissionFrom("another-modal").isEmpty());
     }
 
     @Test
@@ -48,7 +62,7 @@ class ModuleActivationModalTest {
                 (proxy, method, arguments) -> null);
 
         for (ModuleType module : ModuleType.values()) {
-            if (!ModuleActivationModal.requiresConfiguration(module)) {
+            if (!ModuleConfigurationModal.hasEditableSettings(module)) {
                 continue;
             }
             ModuleConfiguration configuration = new ModuleConfiguration(
@@ -59,7 +73,10 @@ class ModuleActivationModalTest {
                     Map.of(),
                     Map.of());
 
-            Modal modal = ModuleActivationModal.create(guild, configuration);
+            Modal modal = ModuleConfigurationModal.create(
+                    guild,
+                    configuration,
+                    ModuleConfigurationModal.SubmissionAction.ACTIVATE);
 
             assertTrue(modal.getComponents().size() >= 1);
             assertTrue(modal.getComponents().size() <= Modal.MAX_COMPONENTS);

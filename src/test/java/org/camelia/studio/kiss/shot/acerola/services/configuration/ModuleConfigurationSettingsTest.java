@@ -10,12 +10,12 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class ModuleActivationSettingsTest {
+class ModuleConfigurationSettingsTest {
     @Test
     void emptySettingsKeepTheCurrentConfiguration() {
         ModuleConfiguration current = configuration();
 
-        ModuleConfiguration candidate = ModuleActivationSettings.empty().applyTo(current);
+        ModuleConfiguration candidate = ModuleConfigurationSettings.empty().applyTo(current);
 
         assertEquals(current, candidate);
     }
@@ -23,7 +23,7 @@ class ModuleActivationSettingsTest {
     @Test
     void selectedFieldsReplaceTheirResourcesAndKeepUnrelatedSettings() {
         ModuleConfiguration current = configuration();
-        ModuleActivationSettings settings = new ModuleActivationSettings(
+        ModuleConfigurationSettings settings = new ModuleConfigurationSettings(
                 "new-log",
                 Map.of(
                         ModuleResourcePurpose.WATCHED, Set.of("watched-role"),

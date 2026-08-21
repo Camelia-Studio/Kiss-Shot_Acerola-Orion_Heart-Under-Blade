@@ -6,18 +6,18 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 
-public record ModuleActivationSettings(
+public record ModuleConfigurationSettings(
         String logChannelId,
         Map<ModuleResourcePurpose, Set<String>> roleIds,
         Map<ModuleResourcePurpose, Set<String>> channelIds
 ) {
-    public ModuleActivationSettings {
+    public ModuleConfigurationSettings {
         roleIds = immutableResources(roleIds);
         channelIds = immutableResources(channelIds);
     }
 
-    public static ModuleActivationSettings empty() {
-        return new ModuleActivationSettings(null, Map.of(), Map.of());
+    public static ModuleConfigurationSettings empty() {
+        return new ModuleConfigurationSettings(null, Map.of(), Map.of());
     }
 
     public ModuleConfiguration applyTo(ModuleConfiguration current) {

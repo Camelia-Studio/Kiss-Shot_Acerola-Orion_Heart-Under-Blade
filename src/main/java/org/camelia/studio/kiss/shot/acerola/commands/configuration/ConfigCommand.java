@@ -10,7 +10,6 @@ import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
-import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfigurationService;
@@ -82,7 +81,7 @@ public class ConfigCommand implements ISlashCommand {
         ModuleConfigurationService service = ModuleConfigurationService.getInstance();
         try {
             switch (subcommand) {
-                case STATUS -> showStatus(event, service);
+                case STATUS -> showDashboard(event, service);
                 case ACTIVATE -> activate(event, service, member);
                 case DISABLE -> reply(event, service.disable(
                         event.getGuild(), selectedModule(event), member.getId()).message());
@@ -102,29 +101,22 @@ public class ConfigCommand implements ISlashCommand {
         }
     }
 
-    private void showStatus(SlashCommandInteractionEvent event, ModuleConfigurationService service) {
+    private void showDashboard(SlashCommandInteractionEvent event, ModuleConfigurationService service) {
         OptionMapping selected = event.getOption("module");
         List<ModuleConfiguration> configurations = service.list(event.getGuild());
-        if (selected != null) {
-            ModuleType module = ModuleType.valueOf(selected.getAsString());
-            configurations = configurations.stream()
-                    .filter(configuration -> configuration.module() == module)
-                    .toList();
+        if (configurations.isEmpty()) {
+            reply(event, "Configuration de module introuvable.");
+            return;
         }
+        ModuleType selectedModule = selected == null
+                ? configurations.getFirst().module()
+                : ModuleType.valueOf(selected.getAsString());
+        ConfigDashboard.View dashboard = ConfigDashboard.create(configurations, selectedModule, null);
 
-        StringBuilder response = new StringBuilder("**Configuration des modules**\n");
-        for (ModuleConfiguration configuration : configurations) {
-            response.append(statusIcon(configuration.status()))
-                    .append(' ')
-                    .append(ModuleActivationModal.label(configuration.module()))
-                    .append(" — ")
-                    .append(statusLabel(configuration.status()));
-            if (configuration.status() == ModuleStatus.SUSPENDED) {
-                response.append(" (").append(configuration.suspensionReason()).append(')');
-            }
-            response.append('\n');
-        }
-        reply(event, response.toString());
+        event.replyEmbeds(dashboard.embed())
+                .addComponents(dashboard.components())
+                .setEphemeral(true)
+                .queue();
     }
 
     private void activate(
@@ -133,7 +125,7 @@ public class ConfigCommand implements ISlashCommand {
             Member member
     ) {
         ModuleType module = selectedModule(event);
-        if (!ModuleActivationModal.requiresConfiguration(module)) {
+        if (!ModuleConfigurationModal.requiresConfigurationForActivation(module)) {
             reply(event, service.activate(event.getGuild(), module, member.getId()).message());
             return;
         }
@@ -143,34 +135,21 @@ public class ConfigCommand implements ISlashCommand {
             reply(event, "Configuration de module introuvable.");
             return;
         }
-        event.replyModal(ModuleActivationModal.create(event.getGuild(), configuration)).queue();
+        event.replyModal(ModuleConfigurationModal.create(
+                event.getGuild(),
+                configuration,
+                ModuleConfigurationModal.SubmissionAction.ACTIVATE)).queue();
     }
 
     private OptionData moduleOption(boolean required) {
         OptionData option = new OptionData(OptionType.STRING, "module", "Module concerné", required);
         Arrays.stream(ModuleType.values()).forEach(module ->
-                option.addChoice(ModuleActivationModal.label(module), module.name()));
+                option.addChoice(ModuleConfigurationModal.label(module), module.name()));
         return option;
     }
 
     private ModuleType selectedModule(SlashCommandInteractionEvent event) {
         return ModuleType.valueOf(event.getOption("module").getAsString());
-    }
-
-    private String statusIcon(ModuleStatus status) {
-        return switch (status) {
-            case DISABLED -> "⚪";
-            case ACTIVE -> "🟢";
-            case SUSPENDED -> "🟠";
-        };
-    }
-
-    private String statusLabel(ModuleStatus status) {
-        return switch (status) {
-            case DISABLED -> "désactivé";
-            case ACTIVE -> "actif";
-            case SUSPENDED -> "suspendu";
-        };
     }
 
     private void reply(SlashCommandInteractionEvent event, String message) {
