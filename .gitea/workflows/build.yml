@@ -6,9 +6,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
     container:
       image: gradle:9.4.1-jdk25
-      options: --user root --volume /var/run/docker.sock:/var/run/docker.sock
+      options: --user root --volume /var/run/docker.sock:/var/run/docker.sock --add-host host.docker.internal:host-gateway
     steps:
       - name: Install checkout runtime
         run: apt-get update && apt-get install -y --no-install-recommends docker.io nodejs
