@@ -21,13 +21,15 @@ public class HibernateConfig {
     public static SessionFactory getSessionFactory() {
         if (sessionFactory == null) {
             try {
+                DatabaseMigrator.migrate();
                 logger.info("Initializing Hibernate SessionFactory");
                 Dotenv dotenv = org.camelia.studio.kiss.shot.acerola.utils.Configuration.getInstance().getDotenv();
 
                 Properties props = new Properties();
 
-                // Configuration Hibernate
-                props.put(Environment.HBM2DDL_AUTO, "update"); // On utilise validate au lieu de update
+                // Flyway est seul responsable du schéma ; Hibernate ne fait que le valider.
+                props.put(Environment.HBM2DDL_AUTO, "validate");
+                props.put("hibernate.jdbc.time_zone", "UTC");
 
                 props.put(Environment.GLOBALLY_QUOTED_IDENTIFIERS, "true");
 

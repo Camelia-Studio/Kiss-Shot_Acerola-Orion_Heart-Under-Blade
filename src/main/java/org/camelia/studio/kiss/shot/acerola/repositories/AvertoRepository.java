@@ -23,16 +23,25 @@ public class AvertoRepository {
         this.sessionFactory = HibernateConfig.getSessionFactory();
     }
 
-    public List<Averto> findAll() {
+    public List<Averto> findByServerAndUser(String serverDiscordId, String userDiscordId, int count) {
         try (Session session = sessionFactory.openSession()) {
-            return session.createQuery("FROM Averto ORDER BY createdAt DESC", Averto.class)
+            return session.createQuery(
+                            "FROM Averto WHERE server.discordId = :serverDiscordId " +
+                                    "AND user.discordId = :userDiscordId ORDER BY createdAt DESC",
+                            Averto.class)
+                    .setParameter("serverDiscordId", serverDiscordId)
+                    .setParameter("userDiscordId", userDiscordId)
+                    .setMaxResults(count)
                     .list();
         }
     }
 
-    public List<Averto> findCount(int count) {
+    public List<Averto> findByServer(String serverDiscordId, int count) {
         try (Session session = sessionFactory.openSession()) {
-            return session.createQuery("FROM Averto ORDER BY createdAt DESC", Averto.class)
+            return session.createQuery(
+                            "FROM Averto WHERE server.discordId = :serverDiscordId ORDER BY createdAt DESC",
+                            Averto.class)
+                    .setParameter("serverDiscordId", serverDiscordId)
                     .setMaxResults(count)
                     .list();
         }

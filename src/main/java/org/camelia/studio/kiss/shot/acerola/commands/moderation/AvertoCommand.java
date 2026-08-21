@@ -5,10 +5,11 @@ import java.util.List;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
+import org.camelia.studio.kiss.shot.acerola.models.DiscordServer;
 import org.camelia.studio.kiss.shot.acerola.models.User;
 import org.camelia.studio.kiss.shot.acerola.repositories.AvertoRepository;
+import org.camelia.studio.kiss.shot.acerola.services.DiscordServerService;
 import org.camelia.studio.kiss.shot.acerola.services.UserService;
-import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
@@ -65,8 +66,12 @@ public class AvertoCommand implements ISlashCommand {
             OptionMapping fileOptionMapping = event.getOption("file");
             Attachment file = null;
             String fileUrl = null;
-            TextChannel logChannel = event.getGuild()
-                    .getTextChannelById(Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID"));
+            String guildId = event.getGuild().getId();
+            DiscordServer server = DiscordServerService.getInstance().register(guildId);
+            TextChannel logChannel = DiscordServerService.getInstance()
+                    .getLogChannelId(guildId)
+                    .map(event.getGuild()::getTextChannelById)
+                    .orElse(null);
 
             if (fileOptionMapping != null) {
                 file = fileOptionMapping.getAsAttachment();
@@ -90,7 +95,7 @@ public class AvertoCommand implements ISlashCommand {
             User memberUser = UserService.getInstance().getOrCreateUser(member.getId());
             User moderatorUser = UserService.getInstance().getOrCreateUser(moderator.getId());
 
-            Averto averto = new Averto(memberUser, moderatorUser);
+            Averto averto = new Averto(memberUser, moderatorUser, server);
             averto.setReason(reason);
             averto.setFile(fileUrl);
 
