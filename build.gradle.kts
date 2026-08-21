@@ -41,9 +41,28 @@ dependencies {
     implementation("commons-codec:commons-codec:1.22.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.3"))
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+val integrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[integrationTest.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
+configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
+
+tasks.register<Test>("integrationTest") {
+    description = "Exécute les tests d'intégration PostgreSQL avec Testcontainers."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    testClassesDirs = integrationTest.output.classesDirs
+    classpath = integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter(tasks.test)
+}
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"

@@ -121,7 +121,8 @@ public class ServerConfigurationRepository {
                     suspensionReason,
                     candidate.logChannelId(),
                     candidate.roleIds(),
-                    candidate.channelIds());
+                    candidate.channelIds(),
+                    candidate.settings());
         });
     }
 

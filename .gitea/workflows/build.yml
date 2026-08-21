@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: dind
     container:
       image: gradle:9.4.1-jdk25
       options: --user root
@@ -16,5 +16,5 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build
-        run: gradle --no-daemon shadowJar
+      - name: Test and build
+        run: gradle --no-daemon test integrationTest shadowJar

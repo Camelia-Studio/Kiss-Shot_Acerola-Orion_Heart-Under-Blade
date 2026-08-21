@@ -102,6 +102,18 @@ Pour la première mise à jour d'une base historique, conserver temporairement `
 java -jar build/libs/kiss-shot-acerola.jar
 ```
 
+### Tests
+
+```bash
+# Suite unitaire
+./gradlew test
+
+# Migrations et isolation multi-serveurs sur PostgreSQL réel (Docker requis)
+./gradlew integrationTest
+```
+
+La CI exécute les deux suites avant de construire le fat JAR.
+
 ## Architecture et contribution
 
 Le projet découvre automatiquement ses composants par réflexion au démarrage :
