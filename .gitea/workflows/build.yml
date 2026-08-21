@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     container:
       image: gradle:9.4.1-jdk25
       options: --user root --add-host host.docker.internal:host-gateway
