@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: dind
     env:
       TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
       TESTCONTAINERS_RYUK_DISABLED: "true"
