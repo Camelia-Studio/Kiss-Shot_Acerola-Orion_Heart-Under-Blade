@@ -6,21 +6,15 @@ on:
 jobs:
   build:
     runs-on: dind
-    env:
-      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
-      TESTCONTAINERS_RYUK_DISABLED: "true"
     container:
       image: gradle:9.4.1-jdk25
-      options: --user root --add-host host.docker.internal:host-gateway
+      options: --user root
     steps:
       - name: Install checkout runtime
-        run: apt-get update && apt-get install -y --no-install-recommends docker.io nodejs
+        run: apt-get update && apt-get install -y --no-install-recommends nodejs
 
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Verify Docker access
-        run: docker info
 
       - name: Test and build
         run: gradle --no-daemon test integrationTest shadowJar
