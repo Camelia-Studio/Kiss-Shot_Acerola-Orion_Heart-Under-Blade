@@ -8,13 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: gradle:9.4.1-jdk25
-      options: --user root
+      options: --user root --volume /var/run/docker.sock:/var/run/docker.sock
     steps:
       - name: Install checkout runtime
-        run: apt-get update && apt-get install -y --no-install-recommends nodejs
+        run: apt-get update && apt-get install -y --no-install-recommends docker.io nodejs
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build
-        run: gradle --no-daemon shadowJar
+      - name: Verify Docker access
+        run: docker info
+
+      - name: Test and build
+        run: gradle --no-daemon test integrationTest shadowJar

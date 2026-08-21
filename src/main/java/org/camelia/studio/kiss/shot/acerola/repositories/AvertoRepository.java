@@ -20,7 +20,11 @@ public class AvertoRepository {
     }
 
     public AvertoRepository() {
-        this.sessionFactory = HibernateConfig.getSessionFactory();
+        this(HibernateConfig.getSessionFactory());
+    }
+
+    AvertoRepository(SessionFactory sessionFactory) {
+        this.sessionFactory = sessionFactory;
     }
 
     public List<Averto> findByServerAndUser(String serverDiscordId, String userDiscordId, int count) {
