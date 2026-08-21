@@ -3,11 +3,14 @@ package org.camelia.studio.kiss.shot.acerola.commands.audio;
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.managers.AudioManager;
+
+import java.util.Optional;
 
 public class StopCommand implements ISlashCommand {
 
@@ -19,6 +22,11 @@ public class StopCommand implements ISlashCommand {
     @Override
     public String getDescription() {
         return "Permet de stopper la musique en cours";
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override

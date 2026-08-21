@@ -2,10 +2,12 @@ package org.camelia.studio.kiss.shot.acerola.commands.moderation;
 
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
 import org.camelia.studio.kiss.shot.acerola.models.DiscordServer;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.models.User;
 import org.camelia.studio.kiss.shot.acerola.repositories.AvertoRepository;
 import org.camelia.studio.kiss.shot.acerola.services.DiscordServerService;
@@ -50,7 +52,12 @@ public class AvertoCommand implements ISlashCommand {
 
     @Override
     public DefaultMemberPermissions defaultPermissions() {
-        return DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS);
+        return DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS);
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.WARNINGS);
     }
 
     @Override

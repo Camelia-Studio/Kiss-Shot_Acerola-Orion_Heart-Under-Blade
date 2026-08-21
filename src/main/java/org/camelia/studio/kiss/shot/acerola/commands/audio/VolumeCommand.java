@@ -3,6 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.commands.audio;
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -11,6 +12,7 @@ import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.managers.AudioManager;
 
 import java.util.List;
+import java.util.Optional;
 
 public class VolumeCommand implements ISlashCommand {
 
@@ -29,6 +31,11 @@ public class VolumeCommand implements ISlashCommand {
         return List.of(
             new OptionData(OptionType.INTEGER, "volume", "Le volume souhaité").setRequired(true).setMinValue(0).setMaxValue(100)
         );
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override

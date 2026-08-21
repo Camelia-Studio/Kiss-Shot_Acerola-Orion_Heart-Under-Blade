@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingDiscordUploader;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingMode;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
@@ -55,10 +56,15 @@ public class RecordCommand implements ISlashCommand {
     }
 
     @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.VOICE_RECORDING);
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
         Member member = event.getMember();
-        if (member == null || !member.hasPermission(Permission.MANAGE_CHANNEL)) {
-            event.reply("Vous devez avoir la permission de gérer les salons pour utiliser cette commande.")
+        if (member == null) {
+            event.reply("Cette commande ne peut être utilisée que sur un serveur.")
                     .setEphemeral(true)
                     .queue();
             return;

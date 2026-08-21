@@ -2,24 +2,26 @@
 package org.camelia.studio.kiss.shot.acerola.commands.utils;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.concrete.*;
 import net.dv8tion.jda.api.entities.channel.unions.GuildChannelUnion;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
-import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.utils.URLFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class MsgSendCommand implements ISlashCommand {
     private final Logger logger = LoggerFactory.getLogger(MsgSendCommand.class);
@@ -44,20 +46,20 @@ public class MsgSendCommand implements ISlashCommand {
     }
 
     @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.BOT_MESSAGES);
+    }
+
+    @Override
+    public DefaultMemberPermissions defaultPermissions() {
+        return DefaultMemberPermissions.enabledFor(Permission.MESSAGE_MANAGE);
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
 
         if (!event.isFromGuild()) {
             event.reply("Cette commande ne peut être utilisée que sur un serveur !").queue();
-            return;
-        }
-        Role roleNeeded = Objects.requireNonNull(event.getGuild()).getRoleById(Configuration.getInstance().getDotenv().get("ROLE_ID"));
-        if (roleNeeded == null) {
-            event.reply("Impossible de trouver le rôle nécessaire pour utiliser cette commande !").queue();
-            return;
-        }
-
-        if (event.getMember() == null || !event.getMember().getRoles().contains(roleNeeded)) {
-            event.reply("Vous n'avez pas la permission d'utiliser cette commande !").queue();
             return;
         }
 

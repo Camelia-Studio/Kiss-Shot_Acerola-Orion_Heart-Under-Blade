@@ -67,11 +67,34 @@ public class ServerModule implements IEntity {
         return module;
     }
 
+    public Long getId() {
+        return id;
+    }
+
+    public DiscordServer getServer() {
+        return server;
+    }
+
     public ModuleStatus getStatus() {
         return status;
     }
 
     public String getSuspensionReason() {
         return suspensionReason;
+    }
+
+    public void activate() {
+        status = ModuleStatus.ACTIVE;
+        suspensionReason = null;
+    }
+
+    public void disable() {
+        status = ModuleStatus.DISABLED;
+        suspensionReason = null;
+    }
+
+    public void suspend(String reason) {
+        status = ModuleStatus.SUSPENDED;
+        suspensionReason = reason;
     }
 }

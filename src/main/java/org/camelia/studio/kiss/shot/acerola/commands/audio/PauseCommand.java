@@ -8,6 +8,9 @@ import net.dv8tion.jda.api.managers.AudioManager;
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
+
+import java.util.Optional;
 
 public class PauseCommand implements ISlashCommand {
     @Override
@@ -18,6 +21,11 @@ public class PauseCommand implements ISlashCommand {
     @Override
     public String getDescription() {
         return "Permet de mettre en pause la musique en cours de lecture";
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override

@@ -2,11 +2,13 @@ package org.camelia.studio.kiss.shot.acerola.commands.audio;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Queue;
 
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 
@@ -36,6 +38,11 @@ public class QueueCommand implements ISlashCommand {
     public List<OptionData> getOptions() {
         return List.of(
                 new OptionData(OptionType.INTEGER, "page", "Numéro de la page à visionner").setRequired(false));
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override

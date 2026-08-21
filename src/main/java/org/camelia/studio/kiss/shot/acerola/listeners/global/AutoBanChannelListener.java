@@ -1,52 +1,37 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
+import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.awt.Color;
-import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
-public class AutoBanChannelListener extends ListenerAdapter {
+public class AutoBanChannelListener extends ModuleAwareListener {
 
     private static final Logger logger = LoggerFactory.getLogger(AutoBanChannelListener.class);
 
-    private final Set<String> watchedChannelIds;
-    private final Set<String> protectedRoleIds;
-
     public AutoBanChannelListener() {
-        String rawChannels = Configuration.getInstance().getDotenv().get("AUTO_BAN_CHANNEL_IDS", "");
-        watchedChannelIds = parseIds(rawChannels);
-
-        String rawRoles = Configuration.getInstance().getDotenv().get("AUTO_BAN_EXEMPT_ROLE_IDS", "");
-        protectedRoleIds = parseIds(rawRoles);
-
-        if (!watchedChannelIds.isEmpty()) {
-            logger.info("AutoBanChannel actif sur {} salon(s), {} rôle(s) protégé(s)",
-                    watchedChannelIds.size(), protectedRoleIds.size());
-        }
-    }
-
-    private static Set<String> parseIds(String raw) {
-        if (raw == null || raw.isBlank()) return Set.of();
-        return Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toUnmodifiableSet());
+        super(ModuleType.AUTO_SANCTION_CHANNEL);
     }
 
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
         if (!event.isFromGuild()) return;
+        var resolved = activeConfiguration(event.getGuild());
+        if (resolved.isEmpty()) return;
+        var configuration = resolved.get();
+        Set<String> watchedChannelIds = configuration.channels(ModuleResourcePurpose.WATCHED);
+        Set<String> protectedRoleIds = configuration.roles(ModuleResourcePurpose.PROTECTED);
         if (watchedChannelIds.isEmpty()) return;
         if (!watchedChannelIds.contains(event.getChannel().getId())) return;
 
@@ -54,6 +39,7 @@ public class AutoBanChannelListener extends ListenerAdapter {
         if (member == null) return;
         if (member.getUser().isBot()) return;
         if (member.isOwner()) return;
+        if (member.hasPermission(Permission.ADMINISTRATOR)) return;
         if (!event.getGuild().getSelfMember().canInteract(member)) return;
         if (member.getRoles().stream().anyMatch(role -> protectedRoleIds.contains(role.getId()))) return;
 
@@ -66,13 +52,13 @@ public class AutoBanChannelListener extends ListenerAdapter {
                         success -> {
                             logger.info("Membre banni automatiquement suite à une publication dans un salon surveillé");
                             sendLogEmbed(event.getGuild().getTextChannelById(
-                                    Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID", "")),
+                                    configuration.logChannelId()),
                                     memberTag, channelMention, null);
                         },
                         error -> {
                             logger.error("Échec du ban automatique : {}", error.getMessage());
                             sendLogEmbed(event.getGuild().getTextChannelById(
-                                    Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID", "")),
+                                    configuration.logChannelId()),
                                     memberTag, channelMention, error.getMessage());
                         }
                 );

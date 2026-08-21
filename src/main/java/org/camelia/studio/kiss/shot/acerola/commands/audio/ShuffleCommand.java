@@ -3,10 +3,13 @@ package org.camelia.studio.kiss.shot.acerola.commands.audio;
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.managers.AudioManager;
+
+import java.util.Optional;
 
 public class ShuffleCommand implements ISlashCommand {
 
@@ -18,6 +21,11 @@ public class ShuffleCommand implements ISlashCommand {
     @Override
     public String getDescription() {
         return "Permet de mélanger la file d'attente";
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override

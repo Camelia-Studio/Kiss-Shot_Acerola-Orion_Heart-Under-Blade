@@ -76,14 +76,11 @@ Les principales variables sont :
 | --- | --- |
 | `BOT_TOKEN` | Jeton de l'application Discord |
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | Connexion à PostgreSQL |
-| `DEFAULT_ROLE_ID` | Rôle attribué aux nouveaux membres |
-| `ROLE_ID` | Rôle autorisé à utiliser les commandes de message |
-| `LOG_CHANNEL_ID` | Salon recevant les journaux de modération |
-| `AUTO_BAN_*`, `ANTI_RAID_*` | Règles de sanction automatique et d'anti-raid |
+| `ANTI_RAID_*` | Valeurs techniques temporaires de l'anti-raid, avant leur migration dans le ticket dédié |
 | `SAUCY_*` | Configuration des aperçus Twitter/X, Pixiv et Misskey |
 | `RECORDING_*` | Configuration des enregistrements vocaux |
 
-La liste complète et les valeurs par défaut se trouvent dans [`.env.example`](.env.example).
+Les salons, rôles, états de modules et autres réglages propres à un serveur sont configurés avec `/config` et stockés dans PostgreSQL. La liste complète des variables globales et leurs valeurs par défaut se trouve dans [`.env.example`](.env.example).
 
 ### Base de données
 
@@ -95,7 +92,7 @@ docker compose up -d
 
 Flyway applique automatiquement les migrations versionnées au démarrage, avant qu'Hibernate valide le schéma. Hibernate ne crée ni ne modifie les tables.
 
-Pour la première mise à jour d'une base historique, conserver temporairement `GUILD_ID` dans `.env` : Flyway l'utilise une seule fois pour rattacher les avertissements existants à leur serveur. La variable peut être supprimée après la migration V2 et n'est pas nécessaire sur une base vide.
+Pour la première mise à jour d'une base historique, conserver temporairement `GUILD_ID` dans `.env` : Flyway l'utilise pour rattacher les avertissements existants et les anciens réglages de modules à leur serveur. La migration V3 reconnaît également `DEFAULT_ROLE_ID`, `LOG_CHANNEL_ID`, `AUTO_BAN_CHANNEL_IDS`, `AUTO_BAN_ROLE_IDS`, `AUTO_BAN_EXEMPT_ROLE_IDS` et `NO_EMBED_CHANNEL_IDS`. Tous les modules migrés restent désactivés. Ces variables peuvent être supprimées après la migration et ne sont pas nécessaires sur une base vide.
 
 ### Compilation et lancement
 
