@@ -1,3 +1,6 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.file.DuplicatesStrategy
+
 plugins {
     application
     id("java")
@@ -25,6 +28,8 @@ dependencies {
     implementation("club.minnced:jdave-native-darwin:0.1.8")
     implementation("org.hibernate.orm:hibernate-core:7.3.1.Final")
     implementation("org.hibernate.orm:hibernate-hikaricp:7.3.1.Final")
+    implementation("org.flywaydb:flyway-core:13.3.0")
+    implementation("org.flywaydb:flyway-database-postgresql:13.3.0")
     implementation("org.postgresql:postgresql:42.7.10")
     implementation("io.github.cdimascio:dotenv-kotlin:6.5.1")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.2")
@@ -48,7 +53,12 @@ tasks.test {
     useJUnitPlatform()
 }
 
-tasks.named<Jar>("shadowJar") {
+tasks.named<ShadowJar>("shadowJar") {
+    filesMatching("META-INF/services/**") {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    mergeServiceFiles()
+
     manifest {
         attributes["Main-Class"] = "org.camelia.studio.kiss.shot.acerola.KissShotAcerola"
     }

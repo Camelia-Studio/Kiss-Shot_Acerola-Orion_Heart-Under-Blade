@@ -4,9 +4,11 @@ import jakarta.persistence.*;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.IEntity;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "avertos")
@@ -21,6 +23,10 @@ public class Averto implements IEntity {
     @ManyToOne(fetch = FetchType.EAGER)
     private User moderator;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "server_id", nullable = false)
+    private DiscordServer server;
+
     @Column(name = "reason", nullable = true, unique = false)
     private String reason;
 
@@ -28,30 +34,33 @@ public class Averto implements IEntity {
     private String file;
 
     @CreationTimestamp
+    @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
     @Column(name = "createdAt")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp
+    @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
     @Column(name = "updatedAt")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     public Averto() {
     }
 
-    public Averto(User user, User moderator) {
+    public Averto(User user, User moderator, DiscordServer server) {
         this.user = user;
         this.moderator = moderator;
+        this.server = server;
     }
 
     public Long getId() {
         return id;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
@@ -77,5 +86,9 @@ public class Averto implements IEntity {
 
     public User getUser() {
         return user;
+    }
+
+    public DiscordServer getServer() {
+        return server;
     }
 }

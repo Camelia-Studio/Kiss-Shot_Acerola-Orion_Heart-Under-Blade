@@ -4,10 +4,11 @@ import jakarta.persistence.*;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.IEntity;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import java.time.Instant;
 
 @Entity
 @Table(name = "users")
@@ -16,22 +17,18 @@ public class User implements IEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER)
-    private List<Averto> avertos;
-
-    @OneToMany(mappedBy = "moderator", fetch = FetchType.EAGER)
-    private List<Averto> moderatedAvertos;
-
     @Column(name = "discordId", nullable = false, unique = true)
     private String discordId;
 
     @CreationTimestamp
+    @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
     @Column(name = "createdAt")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp
+    @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
     @Column(name = "updatedAt")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     public User() {
     }
@@ -52,19 +49,11 @@ public class User implements IEntity {
         this.discordId = discordId;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
-    }
-
-    public List<Averto> getAvertos() {
-        return avertos;
-    }
-
-    public List<Averto> getModeratedAvertos() {
-        return moderatedAvertos;
     }
 }

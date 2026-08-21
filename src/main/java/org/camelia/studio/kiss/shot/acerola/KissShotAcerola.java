@@ -23,6 +23,7 @@ public class KissShotAcerola {
         try {
             Configuration.getInstance();
             OpusNativeLibraryLoader.preloadFromEnvironment();
+            HibernateConfig.getSessionFactory();
 
             jda = JDABuilder.createDefault(Configuration.getInstance().getDotenv().get("BOT_TOKEN"))
                     .addEventListeners(new ReadyListener())
