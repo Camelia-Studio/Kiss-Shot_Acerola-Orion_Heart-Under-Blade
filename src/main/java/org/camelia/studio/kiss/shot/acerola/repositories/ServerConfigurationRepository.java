@@ -64,6 +64,7 @@ public class ServerConfigurationRepository {
 
             replaceRoles(session, module, candidate.roleIds());
             replaceChannels(session, module, candidate.channelIds());
+            updateLogChannel(session, discordId, candidate.logChannelId(), actorId);
             module.activate();
 
             auditIfChanged(session, module, actorId, "roles", format(previous.roleIds()), format(candidate.roleIds()));
@@ -113,24 +114,33 @@ public class ServerConfigurationRepository {
 
     public void setLogChannel(String discordId, String channelId, String actorId) {
         inTransaction(session -> {
-            ServerSettings settings = session.createQuery(
-                            "FROM ServerSettings settings WHERE settings.server.discordId = :discordId",
-                            ServerSettings.class)
-                    .setParameter("discordId", discordId)
-                    .getSingleResult();
-            String previous = settings.getLogChannelId();
-            settings.setLogChannelId(channelId);
-            if (!Objects.equals(previous, channelId)) {
-                session.persist(new ConfigurationHistory(
-                        settingsServer(session, discordId),
-                        actorId,
-                        null,
-                        "log_channel_id",
-                        previous,
-                        channelId));
-            }
+            updateLogChannel(session, discordId, channelId, actorId);
             return null;
         });
+    }
+
+    private void updateLogChannel(
+            Session session,
+            String discordId,
+            String channelId,
+            String actorId
+    ) {
+        ServerSettings settings = session.createQuery(
+                        "FROM ServerSettings settings WHERE settings.server.discordId = :discordId",
+                        ServerSettings.class)
+                .setParameter("discordId", discordId)
+                .getSingleResult();
+        String previous = settings.getLogChannelId();
+        settings.setLogChannelId(channelId);
+        if (!Objects.equals(previous, channelId)) {
+            session.persist(new ConfigurationHistory(
+                    settingsServer(session, discordId),
+                    actorId,
+                    null,
+                    "log_channel_id",
+                    previous,
+                    channelId));
+        }
     }
 
     private Optional<ModuleConfiguration> find(Session session, String discordId, ModuleType moduleType) {

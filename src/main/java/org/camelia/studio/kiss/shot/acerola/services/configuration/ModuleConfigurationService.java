@@ -1,7 +1,6 @@
 package org.camelia.studio.kiss.shot.acerola.services.configuration;
 
 import net.dv8tion.jda.api.entities.Guild;
-import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.repositories.ServerConfigurationRepository;
@@ -13,8 +12,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ModuleConfigurationService {
@@ -82,23 +81,30 @@ public class ModuleConfigurationService {
         return List.copyOf(resolved);
     }
 
+    public synchronized Optional<ModuleConfiguration> find(Guild guild, ModuleType module) {
+        return loadFresh(guild, module);
+    }
+
+    public synchronized ConfigurationOperationResult activate(
+            Guild guild,
+            ModuleType module,
+            String actorId
+    ) {
+        return activate(guild, module, actorId, ModuleActivationSettings.empty());
+    }
+
     public synchronized ConfigurationOperationResult activate(
             Guild guild,
             ModuleType module,
             String actorId,
-            String roleId,
-            String channelId
+            ModuleActivationSettings settings
     ) {
         ModuleConfiguration current = loadFresh(guild, module).orElse(null);
         if (current == null) {
             return ConfigurationOperationResult.failure("Configuration de module introuvable.");
         }
 
-        ModuleConfiguration candidate = applyResources(current, roleId, channelId);
-        if (candidate == null) {
-            return ConfigurationOperationResult.failure(
-                    "Le rôle ou le salon fourni ne correspond pas à ce module.");
-        }
+        ModuleConfiguration candidate = settings.applyTo(current);
 
         ModuleValidationResult validation = validator.validate(guild, candidate);
         if (!validation.valid()) {
@@ -106,6 +112,9 @@ public class ModuleConfigurationService {
         }
 
         ModuleConfiguration active = repository.activate(guild.getId(), candidate, actorId);
+        if (!Objects.equals(current.logChannelId(), candidate.logChannelId())) {
+            cache.keySet().removeIf(key -> key.guildId().equals(guild.getId()));
+        }
         cache.put(new CacheKey(guild.getId(), module), active);
         return ConfigurationOperationResult.success("Le module est maintenant actif.");
     }
@@ -228,38 +237,6 @@ public class ModuleConfigurationService {
                 ModuleStatus.SUSPENDED,
                 validation.reason(),
                 SYSTEM_ACTOR);
-    }
-
-    private ModuleConfiguration applyResources(
-            ModuleConfiguration current,
-            String roleId,
-            String channelId
-    ) {
-        ModuleConfiguration candidate = current;
-
-        if (roleId != null) {
-            candidate = switch (current.module()) {
-                case AUTO_ROLE -> candidate.withRoles(ModuleResourcePurpose.TARGET, Set.of(roleId));
-                case AUTO_SANCTION_ROLE -> candidate.withRoles(ModuleResourcePurpose.WATCHED, Set.of(roleId));
-                case ANTI_RAID, AUTO_SANCTION_CHANNEL ->
-                        candidate.withRoles(ModuleResourcePurpose.PROTECTED, Set.of(roleId));
-                default -> null;
-            };
-            if (candidate == null) {
-                return null;
-            }
-        }
-
-        if (channelId != null) {
-            candidate = switch (current.module()) {
-                case INTEGRATION_REMOVAL, AUTO_SANCTION_CHANNEL ->
-                        candidate.withChannels(ModuleResourcePurpose.WATCHED, Set.of(channelId));
-                case LINK_ENRICHMENT ->
-                        candidate.withChannels(ModuleResourcePurpose.EXCLUDED, Set.of(channelId));
-                default -> null;
-            };
-        }
-        return candidate;
     }
 
     private record CacheKey(String guildId, ModuleType module) {

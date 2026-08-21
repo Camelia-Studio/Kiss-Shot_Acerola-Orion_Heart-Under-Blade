@@ -50,11 +50,7 @@ public class ConfigCommand implements ISlashCommand {
                 new SubcommandData(STATUS, "Affiche l'état des modules")
                         .addOptions(moduleOption(false)),
                 new SubcommandData(ACTIVATE, "Valide puis active un module")
-                        .addOptions(
-                                moduleOption(true),
-                                new OptionData(OptionType.ROLE, "role", "Rôle requis par le module", false),
-                                new OptionData(OptionType.CHANNEL, "channel", "Salon requis par le module", false)
-                                        .setChannelTypes(ChannelType.TEXT, ChannelType.NEWS)),
+                        .addOptions(moduleOption(true)),
                 new SubcommandData(DISABLE, "Désactive un module sans perdre ses réglages")
                         .addOptions(moduleOption(true)),
                 new SubcommandData(REVALIDATE, "Relance la validation d'un module suspendu")
@@ -87,12 +83,7 @@ public class ConfigCommand implements ISlashCommand {
         try {
             switch (subcommand) {
                 case STATUS -> showStatus(event, service);
-                case ACTIVATE -> reply(event, service.activate(
-                        event.getGuild(),
-                        selectedModule(event),
-                        member.getId(),
-                        optionId(event, "role"),
-                        optionId(event, "channel")).message());
+                case ACTIVATE -> activate(event, service, member);
                 case DISABLE -> reply(event, service.disable(
                         event.getGuild(), selectedModule(event), member.getId()).message());
                 case REVALIDATE -> reply(event, service.revalidate(
@@ -125,7 +116,7 @@ public class ConfigCommand implements ISlashCommand {
         for (ModuleConfiguration configuration : configurations) {
             response.append(statusIcon(configuration.status()))
                     .append(' ')
-                    .append(label(configuration.module()))
+                    .append(ModuleActivationModal.label(configuration.module()))
                     .append(" — ")
                     .append(statusLabel(configuration.status()));
             if (configuration.status() == ModuleStatus.SUSPENDED) {
@@ -136,41 +127,34 @@ public class ConfigCommand implements ISlashCommand {
         reply(event, response.toString());
     }
 
+    private void activate(
+            SlashCommandInteractionEvent event,
+            ModuleConfigurationService service,
+            Member member
+    ) {
+        ModuleType module = selectedModule(event);
+        if (!ModuleActivationModal.requiresConfiguration(module)) {
+            reply(event, service.activate(event.getGuild(), module, member.getId()).message());
+            return;
+        }
+
+        ModuleConfiguration configuration = service.find(event.getGuild(), module).orElse(null);
+        if (configuration == null) {
+            reply(event, "Configuration de module introuvable.");
+            return;
+        }
+        event.replyModal(ModuleActivationModal.create(event.getGuild(), configuration)).queue();
+    }
+
     private OptionData moduleOption(boolean required) {
         OptionData option = new OptionData(OptionType.STRING, "module", "Module concerné", required);
-        Arrays.stream(ModuleType.values()).forEach(module -> option.addChoice(label(module), module.name()));
+        Arrays.stream(ModuleType.values()).forEach(module ->
+                option.addChoice(ModuleActivationModal.label(module), module.name()));
         return option;
     }
 
     private ModuleType selectedModule(SlashCommandInteractionEvent event) {
         return ModuleType.valueOf(event.getOption("module").getAsString());
-    }
-
-    private String optionId(SlashCommandInteractionEvent event, String name) {
-        OptionMapping option = event.getOption(name);
-        if (option == null) {
-            return null;
-        }
-        return switch (option.getType()) {
-            case ROLE -> option.getAsRole().getId();
-            case CHANNEL -> option.getAsChannel().getId();
-            default -> null;
-        };
-    }
-
-    private String label(ModuleType module) {
-        return switch (module) {
-            case WARNINGS -> "Avertissements";
-            case AUTO_ROLE -> "Rôle automatique";
-            case MUSIC -> "Musique";
-            case VOICE_RECORDING -> "Enregistrement vocal";
-            case BOT_MESSAGES -> "Messages du bot";
-            case LINK_ENRICHMENT -> "Enrichissement des liens";
-            case INTEGRATION_REMOVAL -> "Suppression des intégrations";
-            case ANTI_RAID -> "Anti-raid";
-            case AUTO_SANCTION_CHANNEL -> "Sanction automatique par salon";
-            case AUTO_SANCTION_ROLE -> "Sanction automatique par rôle";
-        };
     }
 
     private String statusIcon(ModuleStatus status) {
