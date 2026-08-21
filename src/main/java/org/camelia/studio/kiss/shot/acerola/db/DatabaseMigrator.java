@@ -30,6 +30,9 @@ public final class DatabaseMigrator {
         String legacyAutoBanRoleIds = optionalSnowflakeList(dotenv, "AUTO_BAN_ROLE_IDS");
         String legacyProtectedRoleIds = optionalSnowflakeList(dotenv, "AUTO_BAN_EXEMPT_ROLE_IDS");
         String legacyNoEmbedChannelIds = optionalSnowflakeList(dotenv, "NO_EMBED_CHANNEL_IDS");
+        String legacyAntiRaidMinimumAccountAgeDays = positiveInt(dotenv, "ANTI_RAID_MIN_ACCOUNT_AGE_DAYS", 7);
+        String legacyAntiRaidMentionLimit = positiveInt(dotenv, "ANTI_RAID_MENTION_LIMIT", 5);
+        String legacyAntiRaidMentionWindowSeconds = positiveInt(dotenv, "ANTI_RAID_MENTION_WINDOW_SECONDS", 10);
 
         logger.info("Applying database migrations");
         Flyway.configure()
@@ -47,7 +50,10 @@ public final class DatabaseMigrator {
                         "legacyAutoBanChannelIds", legacyAutoBanChannelIds,
                         "legacyAutoBanRoleIds", legacyAutoBanRoleIds,
                         "legacyProtectedRoleIds", legacyProtectedRoleIds,
-                        "legacyNoEmbedChannelIds", legacyNoEmbedChannelIds))
+                        "legacyNoEmbedChannelIds", legacyNoEmbedChannelIds,
+                        "legacyAntiRaidMinimumAccountAgeDays", legacyAntiRaidMinimumAccountAgeDays,
+                        "legacyAntiRaidMentionLimit", legacyAntiRaidMentionLimit,
+                        "legacyAntiRaidMentionWindowSeconds", legacyAntiRaidMentionWindowSeconds))
                 .load()
                 .migrate();
         migrated = true;
@@ -85,5 +91,18 @@ public final class DatabaseMigrator {
                     }
                 })
                 .collect(Collectors.joining(","));
+    }
+
+    private static String positiveInt(Dotenv dotenv, String name, int defaultValue) {
+        String rawValue = dotenv.get(name, String.valueOf(defaultValue)).trim();
+        try {
+            int value = Integer.parseInt(rawValue);
+            if (value > 0) {
+                return String.valueOf(value);
+            }
+        } catch (NumberFormatException ignored) {
+            // The actionable error is raised below.
+        }
+        throw new IllegalStateException("La variable " + name + " doit contenir un entier positif");
     }
 }

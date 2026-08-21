@@ -60,6 +60,14 @@ public class CommandManager {
 
         for (ISlashCommand command : slashCommands) {
             if (command.getName().equals(commandName)) {
+                if (!command.requiredPermissions().isEmpty()
+                        && (event.getMember() == null
+                        || !event.getMember().hasPermission(command.requiredPermissions()))) {
+                    event.reply("Vous ne possédez pas les permissions nécessaires pour cette commande.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
                 if (command.requiredModule().isPresent()) {
                     if (event.getGuild() == null) {
                         event.reply("Cette commande ne peut être utilisée que sur un serveur.")

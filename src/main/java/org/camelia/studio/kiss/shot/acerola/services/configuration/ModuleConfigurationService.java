@@ -2,6 +2,7 @@ package org.camelia.studio.kiss.shot.acerola.services.configuration;
 
 import net.dv8tion.jda.api.entities.Guild;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.repositories.ServerConfigurationRepository;
 import org.camelia.studio.kiss.shot.acerola.services.DiscordServerService;
@@ -112,7 +113,7 @@ public class ModuleConfigurationService {
         }
 
         ModuleConfiguration active = repository.activate(guild.getId(), candidate, actorId);
-        if (!Objects.equals(current.logChannelId(), candidate.logChannelId())) {
+        if (sharedConfigurationChanged(current, candidate)) {
             cache.keySet().removeIf(key -> key.guildId().equals(guild.getId()));
         }
         cache.put(new CacheKey(guild.getId(), module), active);
@@ -147,7 +148,7 @@ public class ModuleConfigurationService {
                 status,
                 suspensionReason,
                 actorId);
-        if (!Objects.equals(current.logChannelId(), candidate.logChannelId())) {
+        if (sharedConfigurationChanged(current, candidate)) {
             cache.keySet().removeIf(key -> key.guildId().equals(guild.getId()));
         }
         cache.put(new CacheKey(guild.getId(), module), configured);
@@ -286,6 +287,16 @@ public class ModuleConfigurationService {
                 ModuleStatus.SUSPENDED,
                 validation.reason(),
                 SYSTEM_ACTOR);
+    }
+
+    private boolean sharedConfigurationChanged(
+            ModuleConfiguration current,
+            ModuleConfiguration candidate
+    ) {
+        return !Objects.equals(current.logChannelId(), candidate.logChannelId())
+                || !Objects.equals(
+                current.roles(ModuleResourcePurpose.PROTECTED),
+                candidate.roles(ModuleResourcePurpose.PROTECTED));
     }
 
     private record CacheKey(String guildId, ModuleType module) {

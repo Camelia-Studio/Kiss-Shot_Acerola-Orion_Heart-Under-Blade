@@ -1,6 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -8,9 +9,11 @@ import net.dv8tion.jda.api.interactions.InteractionHook;
 import org.camelia.studio.kiss.shot.acerola.commands.configuration.ConfigDashboard;
 import org.camelia.studio.kiss.shot.acerola.commands.configuration.ModuleConfigurationModal;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ConfigurationOperationResult;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfigurationService;
+import org.camelia.studio.kiss.shot.acerola.services.moderation.AutoRoleCatchUpService;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +28,13 @@ public class ConfigDashboardListener extends ListenerAdapter {
         if (!ConfigDashboard.MODULE_SELECTOR_ID.equals(event.getComponentId())) {
             return;
         }
-        if (event.getGuild() == null || event.getValues().isEmpty()) {
+        if (event.getGuild() == null || event.getMember() == null || event.getValues().isEmpty()) {
+            return;
+        }
+        if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+            event.reply("Cette configuration est réservée aux administrateurs.")
+                    .setEphemeral(true)
+                    .queue();
             return;
         }
 
@@ -55,10 +64,14 @@ public class ConfigDashboardListener extends ListenerAdapter {
                     .queue();
             return;
         }
+        if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+            event.reply("Cette configuration est réservée aux administrateurs.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
 
-        if (action.type() == ConfigDashboard.ActionType.CONFIGURE
-                || (action.type() == ConfigDashboard.ActionType.ACTIVATE
-                && ModuleConfigurationModal.requiresConfigurationForActivation(action.module()))) {
+        if (isConfigurationAction(action.type())) {
             openModal(event, action);
             return;
         }
@@ -78,6 +91,17 @@ public class ConfigDashboardListener extends ListenerAdapter {
                     null));
             return;
         }
+        if (action.type() == ConfigDashboard.ActionType.CATCH_UP_AUTO_ROLE) {
+            event.deferEdit().queue(hook -> showCatchUpConfirmation(hook, event.getGuild()));
+            return;
+        }
+        if (action.type() == ConfigDashboard.ActionType.CONFIRM_CATCH_UP_AUTO_ROLE) {
+            event.deferEdit().queue(hook -> runAutoRoleCatchUp(
+                    hook,
+                    event.getGuild(),
+                    event.getMember().getId()));
+            return;
+        }
 
         event.deferEdit().queue(hook -> {
             ModuleConfigurationService service = ModuleConfigurationService.getInstance();
@@ -95,8 +119,16 @@ public class ConfigDashboardListener extends ListenerAdapter {
                             event.getGuild(),
                             action.module(),
                             event.getMember().getId());
-                    case CONFIGURE -> throw new IllegalStateException("La configuration nécessite une modale");
-                    case DISABLE, CANCEL -> throw new IllegalStateException("Action intermédiaire inattendue");
+                    case CONFIGURE,
+                         CONFIGURE_RECENT,
+                         CONFIGURE_MENTIONS,
+                         CONFIGURE_TRIGGERS,
+                         CONFIGURE_SANCTION,
+                         CONFIGURE_RESOURCES -> throw new IllegalStateException("La configuration nécessite une modale");
+                    case DISABLE,
+                         CANCEL,
+                         CATCH_UP_AUTO_ROLE,
+                         CONFIRM_CATCH_UP_AUTO_ROLE -> throw new IllegalStateException("Action intermédiaire inattendue");
                 };
                 refresh(hook, event.getGuild(), action.module(), result.message());
             } catch (RuntimeException exception) {
@@ -123,13 +155,11 @@ public class ConfigDashboardListener extends ListenerAdapter {
                 event.reply("Configuration de module introuvable.").setEphemeral(true).queue();
                 return;
             }
-            ModuleConfigurationModal.SubmissionAction modalAction = action.type() == ConfigDashboard.ActionType.ACTIVATE
-                    ? ModuleConfigurationModal.SubmissionAction.ACTIVATE
-                    : ModuleConfigurationModal.SubmissionAction.CONFIGURE;
             event.replyModal(ModuleConfigurationModal.create(
                     event.getGuild(),
                     configuration,
-                    modalAction)).queue();
+                    ModuleConfigurationModal.SubmissionAction.CONFIGURE,
+                    sectionFor(action.type()))).queue();
         } catch (RuntimeException exception) {
             logger.error(
                     "Impossible d'ouvrir la configuration du module {} pour le serveur {}",
@@ -140,6 +170,71 @@ public class ConfigDashboardListener extends ListenerAdapter {
                     .setEphemeral(true)
                     .queue();
         }
+    }
+
+    private boolean isConfigurationAction(ConfigDashboard.ActionType action) {
+        return switch (action) {
+            case CONFIGURE,
+                 CONFIGURE_RECENT,
+                 CONFIGURE_MENTIONS,
+                 CONFIGURE_TRIGGERS,
+                 CONFIGURE_SANCTION,
+                 CONFIGURE_RESOURCES -> true;
+            default -> false;
+        };
+    }
+
+    private ModuleConfigurationModal.Section sectionFor(ConfigDashboard.ActionType action) {
+        return switch (action) {
+            case CONFIGURE -> ModuleConfigurationModal.Section.DEFAULT;
+            case CONFIGURE_RECENT -> ModuleConfigurationModal.Section.RECENT_ACCOUNT;
+            case CONFIGURE_MENTIONS -> ModuleConfigurationModal.Section.MENTION_SPAM;
+            case CONFIGURE_TRIGGERS -> ModuleConfigurationModal.Section.TRIGGERS;
+            case CONFIGURE_SANCTION -> ModuleConfigurationModal.Section.SANCTION;
+            case CONFIGURE_RESOURCES -> ModuleConfigurationModal.Section.RESOURCES;
+            default -> throw new IllegalArgumentException("Cette action n'ouvre aucune configuration");
+        };
+    }
+
+    private void showCatchUpConfirmation(InteractionHook hook, Guild guild) {
+        try {
+            List<ModuleConfiguration> configurations = ModuleConfigurationService.getInstance().list(guild);
+            ConfigDashboard.View dashboard = ConfigDashboard.confirmAutoRoleCatchUp(
+                    configurations,
+                    ModuleType.AUTO_ROLE);
+            hook.editOriginalEmbeds(dashboard.embed())
+                    .setComponents(dashboard.components())
+                    .queue();
+        } catch (RuntimeException exception) {
+            logger.error("Impossible d'afficher la confirmation de rattrapage du serveur {}", guild.getId(), exception);
+            hook.editOriginal("La configuration est temporairement indisponible.").queue();
+        }
+    }
+
+    private void runAutoRoleCatchUp(InteractionHook hook, Guild guild, String actorId) {
+        ModuleConfigurationService service = ModuleConfigurationService.getInstance();
+        ModuleConfiguration configuration = service.activeConfiguration(guild, ModuleType.AUTO_ROLE).orElse(null);
+        if (configuration == null) {
+            refresh(hook, guild, ModuleType.AUTO_ROLE, "Le rôle automatique doit être actif et valide.");
+            return;
+        }
+        String roleId = configuration.roles(ModuleResourcePurpose.TARGET).stream().findFirst().orElse(null);
+        var role = roleId == null ? null : guild.getRoleById(roleId);
+        if (role == null) {
+            refresh(hook, guild, ModuleType.AUTO_ROLE, "Le rôle automatique configuré n'existe plus.");
+            return;
+        }
+
+        hook.editOriginal("Rattrapage en cours…").setComponents().queue();
+        new AutoRoleCatchUpService().catchUp(guild, role, result -> {
+            logger.info(
+                    "Rattrapage auto-rôle demandé par {} sur {} : {} attribution(s), {} échec(s)",
+                    actorId,
+                    guild.getId(),
+                    result.assigned(),
+                    result.failed());
+            refresh(hook, guild, ModuleType.AUTO_ROLE, result.message());
+        });
     }
 
     private void refresh(

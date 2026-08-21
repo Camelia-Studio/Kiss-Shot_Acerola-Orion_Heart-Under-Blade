@@ -1,6 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import org.camelia.studio.kiss.shot.acerola.commands.configuration.ConfigDashboard;
@@ -32,6 +33,12 @@ public class ConfigModalListener extends ListenerAdapter {
                     .queue();
             return;
         }
+        if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+            event.reply("Cette configuration est réservée aux administrateurs.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
 
         if (event.getMessage() == null) {
             event.deferReply(true).queue(hook -> process(event, submission, hook, false));
@@ -49,7 +56,8 @@ public class ConfigModalListener extends ListenerAdapter {
         try {
             ModuleConfigurationSettings settings = ModuleConfigurationModal.settingsFrom(
                     event,
-                    submission.module());
+                    submission.module(),
+                    submission.section());
             ModuleConfigurationService service = ModuleConfigurationService.getInstance();
             ConfigurationOperationResult result = switch (submission.action()) {
                 case ACTIVATE -> service.activate(
@@ -76,6 +84,8 @@ public class ConfigModalListener extends ListenerAdapter {
             hook.editOriginalEmbeds(dashboard.embed())
                     .setComponents(dashboard.components())
                     .queue();
+        } catch (IllegalArgumentException exception) {
+            hook.editOriginal(exception.getMessage()).queue();
         } catch (RuntimeException exception) {
             logger.error(
                     "Configuration modale indisponible pour le serveur {}",

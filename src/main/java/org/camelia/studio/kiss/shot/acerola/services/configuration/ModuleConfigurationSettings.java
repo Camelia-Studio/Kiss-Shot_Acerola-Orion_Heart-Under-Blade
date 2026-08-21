@@ -1,6 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.services.configuration;
 
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleSetting;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -9,15 +10,25 @@ import java.util.Set;
 public record ModuleConfigurationSettings(
         String logChannelId,
         Map<ModuleResourcePurpose, Set<String>> roleIds,
-        Map<ModuleResourcePurpose, Set<String>> channelIds
+        Map<ModuleResourcePurpose, Set<String>> channelIds,
+        Map<ModuleSetting, String> settings
 ) {
     public ModuleConfigurationSettings {
         roleIds = immutableResources(roleIds);
         channelIds = immutableResources(channelIds);
+        settings = Map.copyOf(settings);
+    }
+
+    public ModuleConfigurationSettings(
+            String logChannelId,
+            Map<ModuleResourcePurpose, Set<String>> roleIds,
+            Map<ModuleResourcePurpose, Set<String>> channelIds
+    ) {
+        this(logChannelId, roleIds, channelIds, Map.of());
     }
 
     public static ModuleConfigurationSettings empty() {
-        return new ModuleConfigurationSettings(null, Map.of(), Map.of());
+        return new ModuleConfigurationSettings(null, Map.of(), Map.of(), Map.of());
     }
 
     public ModuleConfiguration applyTo(ModuleConfiguration current) {
@@ -31,7 +42,7 @@ public record ModuleConfigurationSettings(
         for (Map.Entry<ModuleResourcePurpose, Set<String>> entry : channelIds.entrySet()) {
             candidate = candidate.withChannels(entry.getKey(), entry.getValue());
         }
-        return candidate;
+        return candidate.withSettings(settings);
     }
 
     private static Map<ModuleResourcePurpose, Set<String>> immutableResources(
