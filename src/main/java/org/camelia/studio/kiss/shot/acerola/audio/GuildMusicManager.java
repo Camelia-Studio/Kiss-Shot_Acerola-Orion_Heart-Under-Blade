@@ -18,4 +18,11 @@ public class GuildMusicManager {
     public AudioPlayerSendHandler getSendHandler() {
         return sendHandler;
     }
+
+    public void destroy() {
+        scheduler.clearQueue();
+        audioPlayer.stopTrack();
+        audioPlayer.removeListener(scheduler);
+        audioPlayer.destroy();
+    }
 }

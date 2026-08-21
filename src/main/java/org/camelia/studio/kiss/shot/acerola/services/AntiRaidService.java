@@ -80,6 +80,10 @@ public class AntiRaidService {
         return new MentionSpamResult(thresholdReached, totalMentions);
     }
 
+    public synchronized void evictGuild(String guildId) {
+        mentionEvents.keySet().removeIf(key -> key.guildId().equals(guildId));
+    }
+
     public boolean isAccountTooYoung(Instant accountCreatedAt, Instant now) {
         if (defaultMinimumAccountAge == null) {
             throw new IllegalStateException("L'âge minimum doit être fourni par le serveur");

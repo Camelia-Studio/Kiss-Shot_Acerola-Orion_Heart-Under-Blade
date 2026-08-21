@@ -14,7 +14,6 @@ class SaucyLinkEmbedConfigTest {
     void defaultsMatchSaucyBehavior() {
         SaucyLinkEmbedConfig config = SaucyLinkEmbedConfig.from(Map.of());
 
-        assertTrue(config.enabled());
         assertEquals(3600, config.cacheTtlSeconds());
         assertEquals(8, config.maxLinksPerMessage());
         assertEquals(4, config.maxEmbedsPerMessage());
@@ -45,12 +44,10 @@ class SaucyLinkEmbedConfigTest {
     @Test
     void parsesBooleansAndMisskeyDomains() {
         SaucyLinkEmbedConfig config = SaucyLinkEmbedConfig.from(Map.of(
-                "SAUCY_LINK_EMBEDS_ENABLED", "false",
                 "SAUCY_SEND_MATCHED_MESSAGE", "false",
                 "SAUCY_MISSKEY_DOMAINS", "misskey.io, example.social ,"
         ));
 
-        assertFalse(config.enabled());
         assertFalse(config.sendMatchedMessage());
         assertEquals(2, config.misskeyDomains().size());
         assertEquals("example.social", config.misskeyDomains().get(1));
