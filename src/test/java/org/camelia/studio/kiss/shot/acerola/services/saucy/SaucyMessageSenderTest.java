@@ -86,7 +86,6 @@ class SaucyMessageSenderTest {
 
     private static SaucyLinkEmbedConfig config() {
         return new SaucyLinkEmbedConfig(
-                true,
                 3600,
                 8,
                 4,

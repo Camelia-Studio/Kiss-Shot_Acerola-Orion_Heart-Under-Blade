@@ -18,6 +18,11 @@ class SuppressLinkEmbedListenerTest {
     }
 
     @Test
+    void suppressesSaucySupportedLinksWhenEnrichmentIsInactiveForTheGuild() {
+        assertFalse(SuppressLinkEmbedListener.shouldSkipSuppression(false, false, false, true));
+    }
+
+    @Test
     void doesNotSkipNonSaucyUserMessages() {
         assertFalse(SuppressLinkEmbedListener.shouldSkipSuppression(false, true, false, false));
     }

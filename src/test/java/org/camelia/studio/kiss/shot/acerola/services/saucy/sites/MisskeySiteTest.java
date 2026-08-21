@@ -194,7 +194,6 @@ class MisskeySiteTest {
 
     private static SaucyLinkEmbedConfig config(List<String> misskeyDomains) {
         return new SaucyLinkEmbedConfig(
-                true,
                 3600,
                 8,
                 4,

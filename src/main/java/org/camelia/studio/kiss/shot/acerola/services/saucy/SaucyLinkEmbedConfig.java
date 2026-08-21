@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.function.BiFunction;
 
 public record SaucyLinkEmbedConfig(
-        boolean enabled,
         int cacheTtlSeconds,
         int maxLinksPerMessage,
         int maxEmbedsPerMessage,
@@ -25,7 +24,6 @@ public record SaucyLinkEmbedConfig(
 ) {
     private static final Logger logger = LoggerFactory.getLogger(SaucyLinkEmbedConfig.class);
 
-    private static final boolean DEFAULT_ENABLED = true;
     private static final int DEFAULT_CACHE_TTL_SECONDS = 3600;
     private static final int DEFAULT_MAX_LINKS_PER_MESSAGE = 8;
     private static final int DEFAULT_MAX_EMBEDS_PER_MESSAGE = 4;
@@ -52,7 +50,6 @@ public record SaucyLinkEmbedConfig(
 
     private static SaucyLinkEmbedConfig from(BiFunction<String, String, String> get) {
         return new SaucyLinkEmbedConfig(
-                Boolean.parseBoolean(get.apply("SAUCY_LINK_EMBEDS_ENABLED", String.valueOf(DEFAULT_ENABLED))),
                 positiveInt(get, "SAUCY_LINK_CACHE_TTL_SECONDS", DEFAULT_CACHE_TTL_SECONDS),
                 positiveInt(get, "SAUCY_MAX_LINKS_PER_MESSAGE", DEFAULT_MAX_LINKS_PER_MESSAGE),
                 positiveInt(get, "SAUCY_MAX_EMBEDS_PER_MESSAGE", DEFAULT_MAX_EMBEDS_PER_MESSAGE),

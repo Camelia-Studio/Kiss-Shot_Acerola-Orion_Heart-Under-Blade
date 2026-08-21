@@ -26,7 +26,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class RecordingService {
-    private static RecordingService INSTANCE;
+    private static volatile RecordingService INSTANCE;
     private static final Logger logger = LoggerFactory.getLogger(RecordingService.class);
 
     private final RecordingConfig config;
@@ -45,11 +45,28 @@ public class RecordingService {
     }
 
     public static RecordingService getInstance() {
-        if (INSTANCE == null) {
-            RecordingConfig config = RecordingConfig.fromEnv();
-            INSTANCE = new RecordingService(config, new FfmpegAudioTranscoder(config.ffmpegCommand()));
+        RecordingService instance = INSTANCE;
+        if (instance == null) {
+            synchronized (RecordingService.class) {
+                instance = INSTANCE;
+                if (instance == null) {
+                    RecordingConfig config = RecordingConfig.fromEnv();
+                    instance = new RecordingService(config, new FfmpegAudioTranscoder(config.ffmpegCommand()));
+                    INSTANCE = instance;
+                }
+            }
         }
-        return INSTANCE;
+        return instance;
+    }
+
+    public static boolean hasActiveRecordingIfInitialized(long guildId) {
+        return INSTANCE != null && INSTANCE.hasActiveRecording(guildId);
+    }
+
+    public static void cleanupGuildIfInitialized(Guild guild) {
+        if (INSTANCE != null) {
+            INSTANCE.cleanupGuild(guild);
+        }
     }
 
     public synchronized void startRecording(
@@ -106,11 +123,33 @@ public class RecordingService {
         audioManager.setReceivingHandler(null);
 
         RecordingStopResult result = activeRecording.session().stop(transcoder);
-        if (!PlayerManager.getInstance().isMusicPlaying(guild)) {
+        if (!PlayerManager.isMusicPlayingIfInitialized(guild)) {
             audioManager.closeAudioConnection();
         }
 
         return result;
+    }
+
+    public synchronized void cleanupGuild(Guild guild) {
+        long guildId = guild.getIdLong();
+        ActiveRecording activeRecording = recordings.remove(guildId);
+        cancelEmptyChannelTimeout(guildId);
+
+        AudioManager audioManager = guild.getAudioManager();
+        audioManager.setReceivingHandler(null);
+        audioManager.setConnectionListener(null);
+
+        if (activeRecording != null) {
+            try {
+                activeRecording.session().discard();
+            } catch (IOException exception) {
+                logger.error("Impossible de supprimer l'enregistrement temporaire du serveur {}", guildId, exception);
+            }
+        }
+
+        if (!PlayerManager.isMusicPlayingIfInitialized(guild)) {
+            audioManager.closeAudioConnection();
+        }
     }
 
     public Optional<RecordingStatus> getStatus(long guildId) {

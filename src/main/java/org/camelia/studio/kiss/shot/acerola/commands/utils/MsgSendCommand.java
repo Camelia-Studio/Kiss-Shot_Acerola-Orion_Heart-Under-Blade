@@ -1,16 +1,17 @@
-
 package org.camelia.studio.kiss.shot.acerola.commands.utils;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
-import net.dv8tion.jda.api.entities.channel.concrete.*;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.entities.channel.unions.GuildChannelUnion;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
@@ -22,9 +23,11 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public class MsgSendCommand implements ISlashCommand {
-    private final Logger logger = LoggerFactory.getLogger(MsgSendCommand.class);
+    private static final Logger logger = LoggerFactory.getLogger(MsgSendCommand.class);
+
     @Override
     public String getName() {
         return "msgsend";
@@ -38,11 +41,17 @@ public class MsgSendCommand implements ISlashCommand {
     @Override
     public List<OptionData> getOptions() {
         return List.of(
-                new OptionData(OptionType.CHANNEL, "channel", "Le salon où envoyer le message", true).setChannelTypes(ChannelType.NEWS, ChannelType.TEXT, ChannelType.GUILD_NEWS_THREAD, ChannelType.GUILD_PRIVATE_THREAD, ChannelType.GUILD_PUBLIC_THREAD, ChannelType.VOICE, ChannelType.STAGE),
+                new OptionData(OptionType.CHANNEL, "channel", "Le salon où envoyer le message", true)
+                        .setChannelTypes(
+                                ChannelType.NEWS,
+                                ChannelType.TEXT,
+                                ChannelType.GUILD_NEWS_THREAD,
+                                ChannelType.GUILD_PRIVATE_THREAD,
+                                ChannelType.GUILD_PUBLIC_THREAD,
+                                ChannelType.VOICE,
+                                ChannelType.STAGE),
                 new OptionData(OptionType.STRING, "message", "Le message à envoyer", false),
-                new OptionData(OptionType.ATTACHMENT, "attachment", "L'embed à envoyer", false)
-
-        );
+                new OptionData(OptionType.ATTACHMENT, "attachment", "L'embed à envoyer", false));
     }
 
     @Override
@@ -56,70 +65,84 @@ public class MsgSendCommand implements ISlashCommand {
     }
 
     @Override
-    public void execute(SlashCommandInteractionEvent event) {
+    public Set<Permission> requiredPermissions() {
+        return Set.of(Permission.MESSAGE_MANAGE);
+    }
 
-        if (!event.isFromGuild()) {
-            event.reply("Cette commande ne peut être utilisée que sur un serveur !").queue();
+    @Override
+    public void execute(SlashCommandInteractionEvent event) {
+        if (!event.isFromGuild() || event.getGuild() == null) {
+            event.reply("Cette commande ne peut être utilisée que sur un serveur !")
+                    .setEphemeral(true)
+                    .queue();
             return;
         }
 
-        GuildChannelUnion chan = Objects.requireNonNull(event.getOption("channel")).getAsChannel();
+        GuildChannelUnion selectedChannel = Objects.requireNonNull(event.getOption("channel")).getAsChannel();
         OptionMapping message = event.getOption("message");
         OptionMapping attachment = event.getOption("attachment");
-
         if (message == null && attachment == null) {
-            event.reply("Vous devez spécifier un message ou un embed à envoyer !").queue();
+            event.reply("Vous devez spécifier un message ou un embed à envoyer !")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+        if (selectedChannel.getGuild().getIdLong() != event.getGuild().getIdLong()) {
+            event.reply("Le salon doit appartenir au serveur courant.").setEphemeral(true).queue();
             return;
         }
 
-        try {
-            if (message != null) {
-                if (chan.getType() == ChannelType.TEXT) {
-                    TextChannel channel = chan.asTextChannel();
-                    channel.sendMessage(message.getAsString()).queue();
-                } else if (chan.getType() == ChannelType.GUILD_NEWS_THREAD || chan.getType() == ChannelType.GUILD_PRIVATE_THREAD || chan.getType() == ChannelType.GUILD_PUBLIC_THREAD) {
-                    ThreadChannel channel = chan.asThreadChannel();
-                    channel.sendMessage(message.getAsString()).queue();
-                } else if (chan.getType() == ChannelType.NEWS) {
-                    NewsChannel channel = chan.asNewsChannel();
-
-                    channel.sendMessage(message.getAsString()).queue();
-                }else if (chan.getType() == ChannelType.VOICE) {
-                    VoiceChannel channel = chan.asVoiceChannel();
-                    channel.sendMessage(message.getAsString()).queue();
-                }else if (chan.getType() == ChannelType.STAGE) {
-                    StageChannel channel = chan.asStageChannel();
-                    channel.sendMessage(message.getAsString()).queue();
-                }
-            }
-
-            if (attachment != null) {
-                Message.Attachment file = attachment.getAsAttachment();
-                String content = URLFileReader.readFileFromURL(file.getUrl());
-
-
-                if (chan.getType() == ChannelType.TEXT) {
-                    TextChannel channel = chan.asTextChannel();
-                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
-                } else if (chan.getType() == ChannelType.GUILD_NEWS_THREAD || chan.getType() == ChannelType.GUILD_PRIVATE_THREAD || chan.getType() == ChannelType.GUILD_PUBLIC_THREAD) {
-                    ThreadChannel channel = chan.asThreadChannel();
-                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
-                } else if (chan.getType() == ChannelType.NEWS) {
-                    NewsChannel channel = chan.asNewsChannel();
-                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
-                }else if (chan.getType() == ChannelType.VOICE) {
-                    VoiceChannel channel = chan.asVoiceChannel();
-                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
-                }else if (chan.getType() == ChannelType.STAGE) {
-                    StageChannel channel = chan.asStageChannel();
-                    channel.sendMessageEmbeds(EmbedBuilder.fromData(DataObject.fromJson(content)).build()).queue();
-                }
-            }
-
-            event.reply("Message envoyé !").queue();
-        } catch (Exception e) {
-            event.reply("Erreur lors de l'envoi du message !\n%s".formatted(e.getMessage())).queue();
-            logger.error("Erreur lors de l'envoi du message", e);
+        GuildMessageChannel channel = selectedChannel.asGuildMessageChannel();
+        if (!hasBotPermissions(event.getGuild().getSelfMember(), channel, attachment != null, false)) {
+            event.reply("Je ne possède pas les permissions nécessaires dans ce salon.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
         }
+
+        event.deferReply().setEphemeral(true).queue();
+        try {
+            MessageEmbed embed = attachment == null ? null : embedFrom(attachment);
+            var action = message == null
+                    ? channel.sendMessageEmbeds(embed)
+                    : channel.sendMessage(message.getAsString());
+            if (message != null && embed != null) {
+                action.setEmbeds(embed);
+            }
+            action.queue(
+                    success -> event.getHook().editOriginal("Message envoyé !").queue(),
+                    error -> {
+                        logger.error("Erreur lors de l'envoi du message", error);
+                        event.getHook().editOriginal("Erreur lors de l'envoi du message : " + error.getMessage())
+                                .queue();
+                    });
+        } catch (Exception exception) {
+            logger.error("Erreur lors de l'envoi du message", exception);
+            event.getHook().editOriginal("Erreur lors de l'envoi du message : " + exception.getMessage()).queue();
+        }
+    }
+
+    private MessageEmbed embedFrom(OptionMapping attachment) throws Exception {
+        Message.Attachment file = attachment.getAsAttachment();
+        String content = URLFileReader.readFileFromURL(file.getUrl());
+        return EmbedBuilder.fromData(DataObject.fromJson(content)).build();
+    }
+
+    static boolean hasBotPermissions(
+            Member self,
+            GuildMessageChannel channel,
+            boolean embeds,
+            boolean history
+    ) {
+        Permission sendPermission = channel.getType().isThread()
+                ? Permission.MESSAGE_SEND_IN_THREADS
+                : Permission.MESSAGE_SEND;
+        if (!self.hasPermission(channel, Permission.VIEW_CHANNEL, sendPermission)) {
+            return false;
+        }
+        if (embeds && !self.hasPermission(channel, Permission.MESSAGE_EMBED_LINKS)) {
+            return false;
+        }
+        return !history || self.hasPermission(channel, Permission.MESSAGE_HISTORY);
     }
 }

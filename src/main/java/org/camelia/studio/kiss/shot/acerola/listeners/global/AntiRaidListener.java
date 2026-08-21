@@ -1,6 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.events.guild.GuildLeaveEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
@@ -25,6 +26,11 @@ public class AntiRaidListener extends ModuleAwareListener {
     public AntiRaidListener() {
         super(ModuleType.ANTI_RAID);
         logger.info("AntiRaid initialisé avec une configuration isolée par serveur");
+    }
+
+    @Override
+    public void onGuildLeave(@NotNull GuildLeaveEvent event) {
+        antiRaidService.evictGuild(event.getGuild().getId());
     }
 
     @Override

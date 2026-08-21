@@ -100,8 +100,10 @@ public class RecordCommand implements ISlashCommand {
                     event.getChannel().asGuildMessageChannel(),
                     member,
                     mode);
-            event.getHook().editOriginal("Enregistrement démarré dans `%s` en mode `%s`."
-                            .formatted(channel.getName(), label(mode)))
+            event.getHook().editOriginal(("Enregistrement démarré dans `%s` par %s en mode `%s`. "
+                            + "Utilisez `/record action:status` pour le consulter ou "
+                            + "`/record action:stop` pour l'arrêter.")
+                            .formatted(channel.getName(), member.getAsMention(), label(mode)))
                     .queue();
         } catch (Exception e) {
             event.getHook().editOriginal("Impossible de démarrer l'enregistrement: " + e.getMessage()).queue();

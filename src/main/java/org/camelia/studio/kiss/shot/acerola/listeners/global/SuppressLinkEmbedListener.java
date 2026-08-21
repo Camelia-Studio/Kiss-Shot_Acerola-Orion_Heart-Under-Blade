@@ -1,11 +1,13 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.MessageUpdateEvent;
 import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
+import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfigurationService;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyIgnoredContent;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkCache;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
@@ -43,7 +45,11 @@ public class SuppressLinkEmbedListener extends ModuleAwareListener {
                 .orElse(Set.of());
         if (watchedChannelIds.isEmpty()) return;
         if (!watchedChannelIds.contains(event.getChannel().getId())) return;
-        if (shouldSkipSuppression(event.getAuthor().isBot(), event.getMessage().getContentRaw())) return;
+        if (shouldSkipSuppression(
+                event.getGuild(),
+                event.getChannel().getId(),
+                event.getAuthor().isBot(),
+                event.getMessage().getContentRaw())) return;
         suppressIfNeeded(event.getMessage(), event.getChannel().getId());
     }
 
@@ -55,25 +61,34 @@ public class SuppressLinkEmbedListener extends ModuleAwareListener {
                 .orElse(Set.of());
         if (watchedChannelIds.isEmpty()) return;
         if (!watchedChannelIds.contains(event.getChannel().getId())) return;
-        if (shouldSkipSuppression(event.getAuthor().isBot(), event.getMessage().getContentRaw())) return;
+        if (shouldSkipSuppression(
+                event.getGuild(),
+                event.getChannel().getId(),
+                event.getAuthor().isBot(),
+                event.getMessage().getContentRaw())) return;
         suppressIfNeeded(event.getMessage(), event.getChannel().getId());
     }
 
-    private boolean shouldSkipSuppression(boolean authorBot, String content) {
+    private boolean shouldSkipSuppression(Guild guild, String channelId, boolean authorBot, String content) {
         boolean ignoredSaucyContent = SaucyIgnoredContent.hasIgnoredLink(content);
-        boolean saucyMatches = saucyConfig.enabled()
+        boolean linkEnrichmentActive = ModuleConfigurationService.getInstance()
+                .activeConfiguration(guild, ModuleType.LINK_ENRICHMENT)
+                .filter(configuration -> !configuration.channels(ModuleResourcePurpose.EXCLUDED)
+                        .contains(channelId))
+                .isPresent();
+        boolean saucyMatches = linkEnrichmentActive
                 && !ignoredSaucyContent
                 && !saucySiteManager.match(content).isEmpty();
-        return shouldSkipSuppression(authorBot, saucyConfig.enabled(), ignoredSaucyContent, saucyMatches);
+        return shouldSkipSuppression(authorBot, linkEnrichmentActive, ignoredSaucyContent, saucyMatches);
     }
 
     static boolean shouldSkipSuppression(
             boolean authorBot,
-            boolean saucyEnabled,
+            boolean linkEnrichmentActive,
             boolean ignoredSaucyContent,
             boolean saucyMatches
     ) {
-        return authorBot || (saucyEnabled && !ignoredSaucyContent && saucyMatches);
+        return authorBot || (linkEnrichmentActive && !ignoredSaucyContent && saucyMatches);
     }
 
     private void suppressIfNeeded(Message message, String channelId) {

@@ -95,4 +95,22 @@ class AntiRaidServiceTest {
         assertFalse(next.thresholdReached());
         assertEquals(1, next.totalMentions());
     }
+
+    @Test
+    void leavingAGuildOnlyClearsThatGuildMentionWindow() {
+        AntiRaidService service = new AntiRaidService();
+        Instant now = Instant.parse("2026-06-21T12:00:00Z");
+        service.recordMentions("guild-1", "same-user", 2, now, 3, Duration.ofSeconds(10));
+        service.recordMentions("guild-2", "same-user", 2, now, 3, Duration.ofSeconds(10));
+
+        service.evictGuild("guild-1");
+
+        AntiRaidService.MentionSpamResult leftGuild = service.recordMentions(
+                "guild-1", "same-user", 1, now.plusSeconds(1), 3, Duration.ofSeconds(10));
+        AntiRaidService.MentionSpamResult retainedGuild = service.recordMentions(
+                "guild-2", "same-user", 1, now.plusSeconds(1), 3, Duration.ofSeconds(10));
+        assertFalse(leftGuild.thresholdReached());
+        assertEquals(1, leftGuild.totalMentions());
+        assertTrue(retainedGuild.thresholdReached());
+    }
 }

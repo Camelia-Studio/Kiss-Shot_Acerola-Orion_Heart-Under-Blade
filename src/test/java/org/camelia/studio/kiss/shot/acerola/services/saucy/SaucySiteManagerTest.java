@@ -124,7 +124,6 @@ class SaucySiteManagerTest {
 
     private static SaucyLinkEmbedConfig configWithMaxLinks(int maxLinks) {
         return new SaucyLinkEmbedConfig(
-                true,
                 3600,
                 maxLinks,
                 4,

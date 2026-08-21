@@ -44,7 +44,7 @@ public class ModuleConfigurationValidator {
                         Permission.MESSAGE_ATTACH_FILES)
                         ? ModuleValidationResult.success()
                         : ModuleValidationResult.invalid("Aucun salon textuel accessible pour publier les enrichissements");
-                case INTEGRATION_REMOVAL -> validateWatchedChannels(guild, self, configuration, false);
+                case INTEGRATION_REMOVAL -> validateWatchedChannels(guild, self, configuration, true);
                 case ANTI_RAID -> validateAntiRaid(guild, self, configuration);
                 case AUTO_SANCTION_CHANNEL -> validateAutomaticSanction(guild, self, configuration, true, false);
                 case AUTO_SANCTION_ROLE -> validateAutomaticSanction(guild, self, configuration, false, true);

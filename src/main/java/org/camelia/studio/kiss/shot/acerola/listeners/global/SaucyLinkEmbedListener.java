@@ -50,9 +50,7 @@ public class SaucyLinkEmbedListener extends ModuleAwareListener {
         SaucyNsfwGuard nsfwGuard = new SaucyNsfwGuard();
         sender = new SaucyMessageSender(config, partitioner, nsfwGuard);
 
-        if (config.enabled()) {
-            logger.info("SaucyLinkEmbed actif avec {} site(s)", sites.size());
-        }
+        logger.info("SaucyLinkEmbed prêt avec {} site(s)", sites.size());
     }
 
     @Override
@@ -68,7 +66,6 @@ public class SaucyLinkEmbedListener extends ModuleAwareListener {
         }
         String content = event.getMessage().getContentRaw();
         Optional<String> ignoreReason = ignoreReason(
-                config.enabled(),
                 event.isFromGuild(),
                 event.getAuthor().isBot(),
                 content
@@ -96,10 +93,7 @@ public class SaucyLinkEmbedListener extends ModuleAwareListener {
                 });
     }
 
-    static Optional<String> ignoreReason(boolean enabled, boolean fromGuild, boolean authorBot, String content) {
-        if (!enabled) {
-            return Optional.of("saucy link embeds are disabled");
-        }
+    static Optional<String> ignoreReason(boolean fromGuild, boolean authorBot, String content) {
         if (!fromGuild) {
             return Optional.of("message is outside a guild");
         }

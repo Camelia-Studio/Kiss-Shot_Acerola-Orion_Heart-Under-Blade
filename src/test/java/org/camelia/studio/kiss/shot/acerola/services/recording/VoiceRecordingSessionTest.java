@@ -12,6 +12,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class VoiceRecordingSessionTest {
     @TempDir
@@ -95,6 +96,22 @@ class VoiceRecordingSessionTest {
         assertEquals(1, result.files().size());
         assertEquals("recording-20260701-120000-salon-vocal-musique-bot.mp3", result.files().getFirst().fileName());
         assertArrayEquals(new byte[]{0x02, 0x01}, data(Files.readAllBytes(result.files().getFirst().path())));
+    }
+
+    @Test
+    void discardClosesWritersAndDeletesTheGuildSessionDirectory() throws IOException {
+        Path sessionDirectory = tempDir.resolve("guild-1").resolve("session");
+        VoiceRecordingSession session = new VoiceRecordingSession(
+                "guild-1",
+                "Salon vocal",
+                RecordingMode.MIX,
+                sessionDirectory,
+                Instant.parse("2026-07-01T12:00:00Z"));
+
+        session.recordCombinedAudio(new byte[]{0x01, 0x02});
+        session.discard();
+
+        assertFalse(Files.exists(sessionDirectory));
     }
 
     private static byte[] data(byte[] bytes) {
