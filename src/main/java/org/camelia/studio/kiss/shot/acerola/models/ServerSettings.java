@@ -59,4 +59,8 @@ public class ServerSettings implements IEntity {
     public String getLogChannelId() {
         return logChannelId;
     }
+
+    public void setLogChannelId(String logChannelId) {
+        this.logChannelId = logChannelId;
+    }
 }

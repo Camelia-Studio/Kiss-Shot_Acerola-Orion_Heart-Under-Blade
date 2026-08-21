@@ -2,18 +2,18 @@
 package org.camelia.studio.kiss.shot.acerola.commands.utils;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.entities.channel.unions.GuildChannelUnion;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
-import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
 import org.camelia.studio.kiss.shot.acerola.utils.URLFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,19 +45,23 @@ public class MsgEditCommand implements ISlashCommand {
     }
 
     @Override
+    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
+        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.BOT_MESSAGES);
+    }
+
+    @Override
+    public DefaultMemberPermissions defaultPermissions() {
+        return DefaultMemberPermissions.enabledFor(Permission.MESSAGE_MANAGE);
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
 
         if (!event.isFromGuild()) {
             event.reply("Cette commande ne peut être utilisée que sur un serveur !").queue();
             return;
         }
-        Role roleNeeded = Objects.requireNonNull(event.getGuild()).getRoleById(Configuration.getInstance().getDotenv().get("ROLE_ID"));
-        if (roleNeeded == null) {
-            event.reply("Impossible de trouver le rôle nécessaire pour utiliser cette commande !").queue();
-            return;
-        }
-
-        if (event.getMember() == null || !event.getMember().getRoles().contains(roleNeeded)) {
+        if (event.getMember() == null || !event.getMember().hasPermission(Permission.MESSAGE_MANAGE)) {
             event.reply("Vous n'avez pas la permission d'utiliser cette commande !").queue();
             return;
         }

@@ -22,6 +22,11 @@ public class StopCommand implements ISlashCommand {
     }
 
     @Override
+    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
+        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.MUSIC);
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
         // Vérifier si l'utilisateur est dans un canal vocal
         GuildVoiceState voiceState = event.getMember().getVoiceState();

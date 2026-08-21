@@ -55,6 +55,11 @@ public class RecordCommand implements ISlashCommand {
     }
 
     @Override
+    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
+        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.VOICE_RECORDING);
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
         Member member = event.getMember();
         if (member == null || !member.hasPermission(Permission.MANAGE_CHANNEL)) {

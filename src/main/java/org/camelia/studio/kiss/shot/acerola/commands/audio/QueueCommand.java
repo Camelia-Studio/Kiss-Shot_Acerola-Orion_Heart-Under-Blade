@@ -39,6 +39,11 @@ public class QueueCommand implements ISlashCommand {
     }
 
     @Override
+    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
+        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.MUSIC);
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
         event.deferReply().queue();
         OptionMapping option = event.getOption("page");

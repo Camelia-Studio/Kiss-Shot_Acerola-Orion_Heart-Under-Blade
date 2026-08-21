@@ -1,7 +1,9 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyIgnoredContent;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkCache;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
@@ -21,7 +23,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
-public class SaucyLinkEmbedListener extends ListenerAdapter {
+public class SaucyLinkEmbedListener extends ModuleAwareListener {
     private static final Logger logger = LoggerFactory.getLogger(SaucyLinkEmbedListener.class);
 
     private final SaucyLinkEmbedConfig config;
@@ -29,6 +31,7 @@ public class SaucyLinkEmbedListener extends ListenerAdapter {
     private final SaucyMessageSender sender;
 
     public SaucyLinkEmbedListener() {
+        super(ModuleType.LINK_ENRICHMENT);
         config = SaucyLinkEmbedConfig.fromEnvironment();
 
         Duration cacheTtl = Duration.ofSeconds(config.cacheTtlSeconds());
@@ -54,6 +57,15 @@ public class SaucyLinkEmbedListener extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
+        if (!event.isFromGuild()) {
+            return;
+        }
+        var moduleConfiguration = activeConfiguration(event.getGuild());
+        if (moduleConfiguration.isEmpty()
+                || moduleConfiguration.get().channels(ModuleResourcePurpose.EXCLUDED)
+                        .contains(event.getChannel().getId())) {
+            return;
+        }
         String content = event.getMessage().getContentRaw();
         Optional<String> ignoreReason = ignoreReason(
                 config.enabled(),

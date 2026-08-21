@@ -29,7 +29,7 @@ public class AvertoListCommand implements ISlashCommand {
 
     @Override
     public DefaultMemberPermissions defaultPermissions() {
-        return DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS);
+        return DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS);
     }
 
     @Override
@@ -40,6 +40,11 @@ public class AvertoListCommand implements ISlashCommand {
                         "utilisateur",
                         "L'utilisateur dont vous voulez voir les avertissements",
                         false));
+    }
+
+    @Override
+    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
+        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.WARNINGS);
     }
 
     @Override
