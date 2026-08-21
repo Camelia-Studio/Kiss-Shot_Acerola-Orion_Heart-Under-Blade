@@ -4,7 +4,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
@@ -63,20 +63,27 @@ public class AutoBanRoleListener extends ModuleAwareListener {
                 .queue(
                         success -> {
                             logger.info("Membre banni automatiquement suite à l'obtention d'un rôle restreint");
-                            sendLogEmbed(event.getGuild().getTextChannelById(
+                            sendLogEmbed(event.getGuild().getChannelById(
+                                    GuildMessageChannel.class,
                                     configuration.logChannelId()),
                                     memberTag, roleLabel, null);
                         },
                         error -> {
                             logger.error("Échec du ban automatique par rôle : {}", error.getMessage());
-                            sendLogEmbed(event.getGuild().getTextChannelById(
+                            sendLogEmbed(event.getGuild().getChannelById(
+                                    GuildMessageChannel.class,
                                     configuration.logChannelId()),
                                     memberTag, roleLabel, error.getMessage());
                         }
                 );
     }
 
-    private void sendLogEmbed(TextChannel logChannel, String memberTag, String roleLabel, String errorReason) {
+    private void sendLogEmbed(
+            GuildMessageChannel logChannel,
+            String memberTag,
+            String roleLabel,
+            String errorReason
+    ) {
         if (logChannel == null) return;
 
         boolean success = errorReason == null;

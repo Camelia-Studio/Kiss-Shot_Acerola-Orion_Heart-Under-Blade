@@ -2,7 +2,6 @@ package org.camelia.studio.kiss.shot.acerola.commands.configuration;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -59,7 +58,7 @@ public class ConfigCommand implements ISlashCommand {
                                 OptionType.CHANNEL,
                                 "channel",
                                 "Salon de logs",
-                                true).setChannelTypes(ChannelType.TEXT, ChannelType.NEWS)),
+                                true).setChannelTypes(ConfigurationChannelTypes.guildMessageChannels())),
                 new SubcommandData(CLEAR_LOG_CHANNEL, "Supprime le salon de logs configuré"));
     }
 

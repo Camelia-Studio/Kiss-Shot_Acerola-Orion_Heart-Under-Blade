@@ -3,7 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.listeners.global;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
@@ -51,13 +51,15 @@ public class AutoBanChannelListener extends ModuleAwareListener {
                 .queue(
                         success -> {
                             logger.info("Membre banni automatiquement suite à une publication dans un salon surveillé");
-                            sendLogEmbed(event.getGuild().getTextChannelById(
+                            sendLogEmbed(event.getGuild().getChannelById(
+                                    GuildMessageChannel.class,
                                     configuration.logChannelId()),
                                     memberTag, channelMention, null);
                         },
                         error -> {
                             logger.error("Échec du ban automatique : {}", error.getMessage());
-                            sendLogEmbed(event.getGuild().getTextChannelById(
+                            sendLogEmbed(event.getGuild().getChannelById(
+                                    GuildMessageChannel.class,
                                     configuration.logChannelId()),
                                     memberTag, channelMention, error.getMessage());
                         }
@@ -67,7 +69,12 @@ public class AutoBanChannelListener extends ModuleAwareListener {
     private static final Color COLOR_SUCCESS = new Color(0x6A0DAD);
     private static final Color COLOR_FAILURE = Color.ORANGE;
 
-    private void sendLogEmbed(TextChannel logChannel, String memberTag, String channelMention, String errorReason) {
+    private void sendLogEmbed(
+            GuildMessageChannel logChannel,
+            String memberTag,
+            String channelMention,
+            String errorReason
+    ) {
         if (logChannel == null) return;
 
         boolean success = errorReason == null;

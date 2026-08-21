@@ -4,10 +4,12 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 
+import java.util.Arrays;
 import java.util.Set;
 
 public class ModuleConfigurationValidator {
@@ -56,7 +58,11 @@ public class ModuleConfigurationValidator {
         if (channel == null) {
             return ModuleValidationResult.invalid("Le salon de logs n'existe plus");
         }
-        if (!guild.getSelfMember().hasPermission(
+        if (!isWritableMessageChannel(channel)) {
+            return ModuleValidationResult.invalid("Le fil de logs est archivé ou verrouillé");
+        }
+        if (!hasMessageChannelPermissions(
+                guild.getSelfMember(),
                 channel,
                 Permission.VIEW_CHANNEL,
                 Permission.MESSAGE_SEND,
@@ -153,6 +159,28 @@ public class ModuleConfigurationValidator {
     }
 
     private boolean hasUsableMessageChannel(Guild guild, Member self, Permission... permissions) {
-        return guild.getTextChannels().stream().anyMatch(channel -> self.hasPermission(channel, permissions));
+        return guild.getChannelCache().stream()
+                .filter(GuildMessageChannel.class::isInstance)
+                .map(GuildMessageChannel.class::cast)
+                .filter(this::isWritableMessageChannel)
+                .anyMatch(channel -> hasMessageChannelPermissions(self, channel, permissions));
+    }
+
+    private boolean isWritableMessageChannel(GuildMessageChannel channel) {
+        return !(channel instanceof ThreadChannel thread) || (!thread.isArchived() && !thread.isLocked());
+    }
+
+    private boolean hasMessageChannelPermissions(
+            Member self,
+            GuildMessageChannel channel,
+            Permission... permissions
+    ) {
+        Permission[] effectivePermissions = Arrays.stream(permissions)
+                .map(permission -> channel.getType().isThread() && permission == Permission.MESSAGE_SEND
+                        ? Permission.MESSAGE_SEND_IN_THREADS
+                        : permission)
+                .distinct()
+                .toArray(Permission[]::new);
+        return self.hasPermission(channel, effectivePermissions);
     }
 }

@@ -18,7 +18,7 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Message.Attachment;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -75,9 +75,9 @@ public class AvertoCommand implements ISlashCommand {
             String fileUrl = null;
             String guildId = event.getGuild().getId();
             DiscordServer server = DiscordServerService.getInstance().register(guildId);
-            TextChannel logChannel = DiscordServerService.getInstance()
+            GuildMessageChannel logChannel = DiscordServerService.getInstance()
                     .getLogChannelId(guildId)
-                    .map(event.getGuild()::getTextChannelById)
+                    .map(channelId -> event.getGuild().getChannelById(GuildMessageChannel.class, channelId))
                     .orElse(null);
 
             if (fileOptionMapping != null) {
@@ -123,7 +123,7 @@ public class AvertoCommand implements ISlashCommand {
         }
     }
 
-    private Message sendLogMessage(TextChannel logChannel, Member member, File fileTemp, String reason) {
+    private Message sendLogMessage(GuildMessageChannel logChannel, Member member, File fileTemp, String reason) {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setTitle("Avertissement - Règlement enfreint");
         embedBuilder.setDescription("Un utilisateur a été averti pour non respect du règlement");

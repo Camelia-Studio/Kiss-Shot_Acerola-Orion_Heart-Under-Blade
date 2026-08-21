@@ -6,7 +6,6 @@ import net.dv8tion.jda.api.components.selections.EntitySelectMenu.DefaultValue;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu.SelectTarget;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
-import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.interactions.modals.ModalMapping;
@@ -220,6 +219,7 @@ public final class ModuleConfigurationModal {
     ) {
         EntitySelectMenu.Builder selector = EntitySelectMenu.create(id, SelectTarget.ROLE)
                 .setPlaceholder(title)
+                .setRequired(required)
                 .setRequiredRange(required ? 1 : 0, maxSelections);
         setDefaults(selector, currentIds, guild::getRoleById, DefaultValue::from);
         return Label.of(title, description, selector.build());
@@ -236,7 +236,8 @@ public final class ModuleConfigurationModal {
     ) {
         EntitySelectMenu.Builder selector = EntitySelectMenu.create(id, SelectTarget.CHANNEL)
                 .setPlaceholder(title)
-                .setChannelTypes(ChannelType.TEXT, ChannelType.NEWS)
+                .setChannelTypes(ConfigurationChannelTypes.guildMessageChannels())
+                .setRequired(required)
                 .setRequiredRange(required ? 1 : 0, maxSelections);
         setDefaults(selector, currentIds, guild::getGuildChannelById, DefaultValue::from);
         return Label.of(title, description, selector.build());

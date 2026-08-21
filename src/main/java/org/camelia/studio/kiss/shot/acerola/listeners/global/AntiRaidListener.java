@@ -3,7 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.listeners.global;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
@@ -118,13 +118,15 @@ public class AntiRaidListener extends ModuleAwareListener {
                 .queue(
                         success -> {
                             logger.info("Membre banni automatiquement par AntiRaid : {} - {}", rule, details);
-                            sendLogEmbed(member.getGuild().getTextChannelById(
+                            sendLogEmbed(member.getGuild().getChannelById(
+                                    GuildMessageChannel.class,
                                     configuration.logChannelId()),
                                     memberTag, rule, details, null);
                         },
                         error -> {
                             logger.error("Échec du ban AntiRaid : {}", error.getMessage());
-                            sendLogEmbed(member.getGuild().getTextChannelById(
+                            sendLogEmbed(member.getGuild().getChannelById(
+                                    GuildMessageChannel.class,
                                     configuration.logChannelId()),
                                     memberTag, rule, details, error.getMessage());
                         }
@@ -132,7 +134,7 @@ public class AntiRaidListener extends ModuleAwareListener {
     }
 
     private void sendLogEmbed(
-            TextChannel logChannel,
+            GuildMessageChannel logChannel,
             String memberTag,
             String rule,
             String details,
