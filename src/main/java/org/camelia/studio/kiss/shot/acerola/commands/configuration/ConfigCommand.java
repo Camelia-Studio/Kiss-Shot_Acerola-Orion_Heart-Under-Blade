@@ -77,13 +77,6 @@ public class ConfigCommand implements ISlashCommand {
                     .queue();
             return;
         }
-        if (!member.isOwner() && !member.hasPermission(Permission.ADMINISTRATOR)) {
-            event.reply("Seuls le propriétaire du serveur et les administrateurs peuvent utiliser `/config`.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
         String subcommand = event.getSubcommandName();
         if (subcommand == null) {
             reply(event, "Action de configuration inconnue.");

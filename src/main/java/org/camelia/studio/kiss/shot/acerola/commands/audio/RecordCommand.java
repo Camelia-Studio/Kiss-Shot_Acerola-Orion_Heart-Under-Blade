@@ -63,8 +63,8 @@ public class RecordCommand implements ISlashCommand {
     @Override
     public void execute(SlashCommandInteractionEvent event) {
         Member member = event.getMember();
-        if (member == null || !member.hasPermission(Permission.MANAGE_CHANNEL)) {
-            event.reply("Vous devez avoir la permission de gérer les salons pour utiliser cette commande.")
+        if (member == null) {
+            event.reply("Cette commande ne peut être utilisée que sur un serveur.")
                     .setEphemeral(true)
                     .queue();
             return;

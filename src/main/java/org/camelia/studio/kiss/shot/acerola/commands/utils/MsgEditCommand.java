@@ -63,10 +63,6 @@ public class MsgEditCommand implements ISlashCommand {
             event.reply("Cette commande ne peut être utilisée que sur un serveur !").queue();
             return;
         }
-        if (event.getMember() == null || !event.getMember().hasPermission(Permission.MESSAGE_MANAGE)) {
-            event.reply("Vous n'avez pas la permission d'utiliser cette commande !").queue();
-            return;
-        }
 
         String messageId = Objects.requireNonNull(event.getOption("message_id")).getAsString();
 

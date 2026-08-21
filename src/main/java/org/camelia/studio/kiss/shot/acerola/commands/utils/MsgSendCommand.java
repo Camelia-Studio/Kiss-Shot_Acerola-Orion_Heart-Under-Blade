@@ -62,10 +62,6 @@ public class MsgSendCommand implements ISlashCommand {
             event.reply("Cette commande ne peut être utilisée que sur un serveur !").queue();
             return;
         }
-        if (event.getMember() == null || !event.getMember().hasPermission(Permission.MESSAGE_MANAGE)) {
-            event.reply("Vous n'avez pas la permission d'utiliser cette commande !").queue();
-            return;
-        }
 
         GuildChannelUnion chan = Objects.requireNonNull(event.getOption("channel")).getAsChannel();
         OptionMapping message = event.getOption("message");
