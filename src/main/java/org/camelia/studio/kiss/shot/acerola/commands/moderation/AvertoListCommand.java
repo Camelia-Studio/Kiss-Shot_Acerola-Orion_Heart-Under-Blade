@@ -1,9 +1,11 @@
 package org.camelia.studio.kiss.shot.acerola.commands.moderation;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.AvertoService;
 
 import net.dv8tion.jda.api.EmbedBuilder;
@@ -43,8 +45,8 @@ public class AvertoListCommand implements ISlashCommand {
     }
 
     @Override
-    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
-        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.WARNINGS);
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.WARNINGS);
     }
 
     @Override

@@ -3,6 +3,7 @@ package org.camelia.studio.kiss.shot.acerola.commands.audio;
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 
@@ -11,6 +12,7 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.managers.AudioManager;
 
 import java.awt.Color;
+import java.util.Optional;
 
 public class NowPlayingCommand implements ISlashCommand {
     @Override
@@ -24,8 +26,8 @@ public class NowPlayingCommand implements ISlashCommand {
     }
 
     @Override
-    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
-        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.MUSIC);
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override

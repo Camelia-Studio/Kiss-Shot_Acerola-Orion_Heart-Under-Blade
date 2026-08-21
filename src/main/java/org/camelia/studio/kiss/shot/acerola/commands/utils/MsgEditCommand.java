@@ -14,12 +14,14 @@ import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.utils.URLFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class MsgEditCommand implements ISlashCommand {
     private final Logger logger = LoggerFactory.getLogger(MsgEditCommand.class);
@@ -45,8 +47,8 @@ public class MsgEditCommand implements ISlashCommand {
     }
 
     @Override
-    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
-        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.BOT_MESSAGES);
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.BOT_MESSAGES);
     }
 
     @Override

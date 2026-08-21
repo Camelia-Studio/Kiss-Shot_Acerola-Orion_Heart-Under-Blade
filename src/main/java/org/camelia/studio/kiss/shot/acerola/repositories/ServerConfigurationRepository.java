@@ -2,6 +2,7 @@ package org.camelia.studio.kiss.shot.acerola.repositories;
 
 import org.camelia.studio.kiss.shot.acerola.db.HibernateConfig;
 import org.camelia.studio.kiss.shot.acerola.models.ConfigurationHistory;
+import org.camelia.studio.kiss.shot.acerola.models.DiscordServer;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
@@ -20,6 +21,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -118,7 +120,7 @@ public class ServerConfigurationRepository {
                     .getSingleResult();
             String previous = settings.getLogChannelId();
             settings.setLogChannelId(channelId);
-            if (!java.util.Objects.equals(previous, channelId)) {
+            if (!Objects.equals(previous, channelId)) {
                 session.persist(new ConfigurationHistory(
                         settingsServer(session, discordId),
                         actorId,
@@ -207,7 +209,7 @@ public class ServerConfigurationRepository {
             String oldValue,
             String newValue
     ) {
-        if (java.util.Objects.equals(oldValue, newValue)) {
+        if (Objects.equals(oldValue, newValue)) {
             return;
         }
         session.persist(new ConfigurationHistory(
@@ -234,13 +236,13 @@ public class ServerConfigurationRepository {
                 .orElseThrow(() -> new IllegalStateException("Configuration de module introuvable"));
     }
 
-    private org.camelia.studio.kiss.shot.acerola.models.DiscordServer settingsServer(
+    private DiscordServer settingsServer(
             Session session,
             String discordId
     ) {
         return session.createQuery(
                         "FROM DiscordServer WHERE discordId = :discordId",
-                        org.camelia.studio.kiss.shot.acerola.models.DiscordServer.class)
+                        DiscordServer.class)
                 .setParameter("discordId", discordId)
                 .getSingleResult();
     }

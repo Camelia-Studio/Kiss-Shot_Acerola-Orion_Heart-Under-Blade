@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingDiscordUploader;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingMode;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
@@ -55,8 +56,8 @@ public class RecordCommand implements ISlashCommand {
     }
 
     @Override
-    public java.util.Optional<org.camelia.studio.kiss.shot.acerola.models.ModuleType> requiredModule() {
-        return java.util.Optional.of(org.camelia.studio.kiss.shot.acerola.models.ModuleType.VOICE_RECORDING);
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.VOICE_RECORDING);
     }
 
     @Override

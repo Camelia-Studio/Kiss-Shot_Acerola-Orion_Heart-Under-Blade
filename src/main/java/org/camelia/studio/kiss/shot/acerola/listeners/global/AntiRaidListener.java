@@ -1,6 +1,7 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
@@ -98,7 +99,7 @@ public class AntiRaidListener extends ModuleAwareListener {
     private boolean shouldIgnore(Member member, ModuleConfiguration configuration) {
         if (member.getUser().isBot()) return true;
         if (member.isOwner()) return true;
-        if (member.hasPermission(net.dv8tion.jda.api.Permission.ADMINISTRATOR)) return true;
+        if (member.hasPermission(Permission.ADMINISTRATOR)) return true;
         if (!member.getGuild().getSelfMember().canInteract(member)) return true;
         Set<String> protectedRoleIds = configuration.roles(ModuleResourcePurpose.PROTECTED);
         return member.getRoles().stream().anyMatch(role -> protectedRoleIds.contains(role.getId()));
