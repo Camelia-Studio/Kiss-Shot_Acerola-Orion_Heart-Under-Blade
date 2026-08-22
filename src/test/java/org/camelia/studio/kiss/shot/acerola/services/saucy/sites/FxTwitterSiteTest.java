@@ -361,7 +361,6 @@ class FxTwitterSiteTest {
 
     private static SaucyLinkEmbedConfig config(long maxFileBytes) {
         return new SaucyLinkEmbedConfig(
-                true,
                 3600,
                 8,
                 4,

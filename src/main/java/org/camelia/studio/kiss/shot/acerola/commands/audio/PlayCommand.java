@@ -11,9 +11,11 @@ import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.managers.AudioManager;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
 
 public class PlayCommand implements ISlashCommand {
@@ -31,6 +33,11 @@ public class PlayCommand implements ISlashCommand {
     public List<OptionData> getOptions() {
         return List.of(
                 new OptionData(OptionType.STRING, "url", "URL de la musique à jouer", true));
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override

@@ -1,13 +1,13 @@
 package org.camelia.studio.kiss.shot.acerola.commands.moderation;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
-import org.camelia.studio.kiss.shot.acerola.models.User;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.AvertoService;
-import org.camelia.studio.kiss.shot.acerola.services.UserService;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
@@ -32,7 +32,12 @@ public class AvertoListCommand implements ISlashCommand {
 
     @Override
     public DefaultMemberPermissions defaultPermissions() {
-        return DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS);
+        return DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS);
+    }
+
+    @Override
+    public Set<Permission> requiredPermissions() {
+        return Set.of(Permission.MODERATE_MEMBERS);
     }
 
     @Override
@@ -46,20 +51,24 @@ public class AvertoListCommand implements ISlashCommand {
     }
 
     @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.WARNINGS);
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
         event.deferReply().setEphemeral(true).queue();
         OptionMapping option = event.getOption("utilisateur");
 
         Member member = null;
         List<Averto> avertos = null;
-        User user = null;
+        String guildId = event.getGuild().getId();
 
         if (option != null) {
             member = option.getAsMember();
-            user = UserService.getInstance().getOrCreateUser(member.getId());
-            avertos = user.getAvertos();
+            avertos = AvertoService.getInstance().getLatestAvertosForUser(guildId, member.getId(), 10);
         } else {
-            avertos = AvertoService.getInstance().getLatestAvertos(10);
+            avertos = AvertoService.getInstance().getLatestAvertos(guildId, 10);
         }
         /*
          * 2 possibilités :
@@ -87,7 +96,7 @@ public class AvertoListCommand implements ISlashCommand {
                             "Raison : " + averto.getReason() + "\n" +
                             (moderator != null ? "Modérateur : " + moderator.getAsMention() : "") + "\n" +
                             "Date : "
-                            + averto.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
+                            + "<t:" + averto.getCreatedAt().getEpochSecond() + ":f>" +
                             "\n" +
                             "Preuve : " + (averto.getFile() != null ? averto.getFile() : "Aucune"),
                     false);

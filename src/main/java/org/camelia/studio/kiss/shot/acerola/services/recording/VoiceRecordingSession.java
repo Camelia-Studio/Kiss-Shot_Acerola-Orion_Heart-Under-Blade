@@ -153,6 +153,44 @@ public class VoiceRecordingSession {
         return new RecordingStopResult(guildId, channelName, mode, startedAt, Instant.now(), List.copyOf(artifacts));
     }
 
+    public synchronized void discard() throws IOException {
+        IOException cleanupFailure = null;
+        if (!stopped) {
+            stopped = true;
+            List<TrackWriter> writers = new ArrayList<>();
+            if (mixWriter != null) {
+                writers.add(mixWriter);
+            }
+            writers.addAll(trackWriters.values());
+
+            for (TrackWriter writer : writers) {
+                try {
+                    writer.writer().close();
+                } catch (IOException exception) {
+                    if (cleanupFailure == null) {
+                        cleanupFailure = exception;
+                    } else {
+                        cleanupFailure.addSuppressed(exception);
+                    }
+                }
+            }
+            queuedBotFrames.clear();
+        }
+
+        try {
+            deleteSessionDirectory();
+        } catch (IOException exception) {
+            if (cleanupFailure == null) {
+                cleanupFailure = exception;
+            } else {
+                cleanupFailure.addSuppressed(exception);
+            }
+        }
+        if (cleanupFailure != null) {
+            throw cleanupFailure;
+        }
+    }
+
     public synchronized int openFileCount() {
         int count = trackWriters.size();
         return mixWriter == null ? count : count + 1;
@@ -168,6 +206,17 @@ public class VoiceRecordingSession {
 
     public String channelName() {
         return channelName;
+    }
+
+    private void deleteSessionDirectory() throws IOException {
+        if (!Files.exists(sessionDirectory)) {
+            return;
+        }
+        try (var paths = Files.walk(sessionDirectory)) {
+            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 
     private TrackWriter getMixWriter() throws IOException {

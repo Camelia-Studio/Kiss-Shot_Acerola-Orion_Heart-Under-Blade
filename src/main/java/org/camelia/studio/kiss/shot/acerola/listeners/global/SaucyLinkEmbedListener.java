@@ -1,7 +1,9 @@
 package org.camelia.studio.kiss.shot.acerola.listeners.global;
 
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.camelia.studio.kiss.shot.acerola.listeners.ModuleAwareListener;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyIgnoredContent;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkCache;
 import org.camelia.studio.kiss.shot.acerola.services.saucy.SaucyLinkEmbedConfig;
@@ -21,7 +23,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
-public class SaucyLinkEmbedListener extends ListenerAdapter {
+public class SaucyLinkEmbedListener extends ModuleAwareListener {
     private static final Logger logger = LoggerFactory.getLogger(SaucyLinkEmbedListener.class);
 
     private final SaucyLinkEmbedConfig config;
@@ -29,6 +31,7 @@ public class SaucyLinkEmbedListener extends ListenerAdapter {
     private final SaucyMessageSender sender;
 
     public SaucyLinkEmbedListener() {
+        super(ModuleType.LINK_ENRICHMENT);
         config = SaucyLinkEmbedConfig.fromEnvironment();
 
         Duration cacheTtl = Duration.ofSeconds(config.cacheTtlSeconds());
@@ -47,16 +50,22 @@ public class SaucyLinkEmbedListener extends ListenerAdapter {
         SaucyNsfwGuard nsfwGuard = new SaucyNsfwGuard();
         sender = new SaucyMessageSender(config, partitioner, nsfwGuard);
 
-        if (config.enabled()) {
-            logger.info("SaucyLinkEmbed actif avec {} site(s)", sites.size());
-        }
+        logger.info("SaucyLinkEmbed prêt avec {} site(s)", sites.size());
     }
 
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
+        if (!event.isFromGuild()) {
+            return;
+        }
+        var moduleConfiguration = activeConfiguration(event.getGuild());
+        if (moduleConfiguration.isEmpty()
+                || moduleConfiguration.get().channels(ModuleResourcePurpose.EXCLUDED)
+                        .contains(event.getChannel().getId())) {
+            return;
+        }
         String content = event.getMessage().getContentRaw();
         Optional<String> ignoreReason = ignoreReason(
-                config.enabled(),
                 event.isFromGuild(),
                 event.getAuthor().isBot(),
                 content
@@ -84,10 +93,7 @@ public class SaucyLinkEmbedListener extends ListenerAdapter {
                 });
     }
 
-    static Optional<String> ignoreReason(boolean enabled, boolean fromGuild, boolean authorBot, String content) {
-        if (!enabled) {
-            return Optional.of("saucy link embeds are disabled");
-        }
+    static Optional<String> ignoreReason(boolean fromGuild, boolean authorBot, String content) {
         if (!fromGuild) {
             return Optional.of("message is outside a guild");
         }

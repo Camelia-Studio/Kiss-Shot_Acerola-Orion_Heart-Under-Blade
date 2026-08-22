@@ -16,8 +16,12 @@ public class AvertoService {
         return instance;
     }
 
-    public List<Averto> getLatestAvertos(int amount) {
-        return AvertoRepository.getInstance().findCount(amount);
+    public List<Averto> getLatestAvertos(String serverDiscordId, int amount) {
+        return AvertoRepository.getInstance().findByServer(serverDiscordId, amount);
+    }
+
+    public List<Averto> getLatestAvertosForUser(String serverDiscordId, String userDiscordId, int amount) {
+        return AvertoRepository.getInstance().findByServerAndUser(serverDiscordId, userDiscordId, amount);
     }
 
 }

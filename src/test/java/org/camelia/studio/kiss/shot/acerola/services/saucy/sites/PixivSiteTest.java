@@ -401,7 +401,6 @@ class PixivSiteTest {
 
     private static SaucyLinkEmbedConfig config(String cookie, long maxFileBytes, int pixivImageLimit) {
         return new SaucyLinkEmbedConfig(
-                true,
                 3600,
                 8,
                 4,

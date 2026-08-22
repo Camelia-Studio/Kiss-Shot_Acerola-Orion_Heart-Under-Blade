@@ -1,21 +1,26 @@
 package org.camelia.studio.kiss.shot.acerola.commands.moderation;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.Averto;
+import org.camelia.studio.kiss.shot.acerola.models.DiscordServer;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.models.User;
 import org.camelia.studio.kiss.shot.acerola.repositories.AvertoRepository;
+import org.camelia.studio.kiss.shot.acerola.services.DiscordServerService;
 import org.camelia.studio.kiss.shot.acerola.services.UserService;
-import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Message.Attachment;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -49,7 +54,17 @@ public class AvertoCommand implements ISlashCommand {
 
     @Override
     public DefaultMemberPermissions defaultPermissions() {
-        return DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS);
+        return DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS);
+    }
+
+    @Override
+    public Set<Permission> requiredPermissions() {
+        return Set.of(Permission.MODERATE_MEMBERS);
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.WARNINGS);
     }
 
     @Override
@@ -65,8 +80,13 @@ public class AvertoCommand implements ISlashCommand {
             OptionMapping fileOptionMapping = event.getOption("file");
             Attachment file = null;
             String fileUrl = null;
-            TextChannel logChannel = event.getGuild()
-                    .getTextChannelById(Configuration.getInstance().getDotenv().get("LOG_CHANNEL_ID"));
+            String proofNotice = "";
+            String guildId = event.getGuild().getId();
+            DiscordServer server = DiscordServerService.getInstance().register(guildId);
+            GuildMessageChannel logChannel = DiscordServerService.getInstance()
+                    .getLogChannelId(guildId)
+                    .map(channelId -> event.getGuild().getChannelById(GuildMessageChannel.class, channelId))
+                    .orElse(null);
 
             if (fileOptionMapping != null) {
                 file = fileOptionMapping.getAsAttachment();
@@ -74,23 +94,33 @@ public class AvertoCommand implements ISlashCommand {
 
             if (logChannel != null) {
                 File fileTemp = null;
-                if (file != null) {
-                    fileTemp = File.createTempFile("proof_" + member.getId() + "_", "." + file.getFileExtension());
-                    fileTemp = file.getProxy().downloadToFile(fileTemp).get();
-                }
+                try {
+                    if (file != null) {
+                        fileTemp = File.createTempFile("proof_" + member.getId() + "_", "." + file.getFileExtension());
+                        fileTemp = file.getProxy().downloadToFile(fileTemp).get();
+                    }
 
-                Message message = this.sendLogMessage(logChannel, member, fileTemp, reason);
+                    Message message = this.sendLogMessage(logChannel, member, fileTemp, reason);
 
-                if (fileTemp != null) {
-                    fileUrl = message.getAttachments().get(0).getUrl();
-                    fileTemp.delete();
+                    if (fileTemp != null && !message.getAttachments().isEmpty()) {
+                        fileUrl = message.getAttachments().getFirst().getUrl();
+                    }
+                } catch (Exception logError) {
+                    proofNotice = " Le salon de logs était indisponible ; la preuve n'a pas été conservée.";
+                    logger.warn("Impossible de journaliser l'avertissement sur {}", guildId, logError);
+                } finally {
+                    if (fileTemp != null) {
+                        Files.deleteIfExists(fileTemp.toPath());
+                    }
                 }
+            } else if (file != null) {
+                proofNotice = " Aucun salon de logs n'est configuré ; la preuve n'a pas été conservée.";
             }
 
             User memberUser = UserService.getInstance().getOrCreateUser(member.getId());
             User moderatorUser = UserService.getInstance().getOrCreateUser(moderator.getId());
 
-            Averto averto = new Averto(memberUser, moderatorUser);
+            Averto averto = new Averto(memberUser, moderatorUser, server);
             averto.setReason(reason);
             averto.setFile(fileUrl);
 
@@ -104,14 +134,15 @@ public class AvertoCommand implements ISlashCommand {
                         .queue(null, err -> logger.warn("Impossible d'envoyer le MP d'averto : {}", err.getMessage()));
             }, err -> logger.warn("Impossible d'ouvrir le canal privé pour l'averto : {}", err.getMessage()));
 
-            event.getHook().editOriginal("L'utilisateur %s a bien été averti !".formatted(member.getAsMention()))
+            event.getHook().editOriginal(("L'utilisateur %s a bien été averti !" + proofNotice)
+                            .formatted(member.getAsMention()))
                     .queue();
         } catch (Exception e) {
             event.getHook().editOriginal("Une erreur est survenue lors de l'avertissement, " + e.getMessage()).queue();
         }
     }
 
-    private Message sendLogMessage(TextChannel logChannel, Member member, File fileTemp, String reason) {
+    private Message sendLogMessage(GuildMessageChannel logChannel, Member member, File fileTemp, String reason) {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setTitle("Avertissement - Règlement enfreint");
         embedBuilder.setDescription("Un utilisateur a été averti pour non respect du règlement");

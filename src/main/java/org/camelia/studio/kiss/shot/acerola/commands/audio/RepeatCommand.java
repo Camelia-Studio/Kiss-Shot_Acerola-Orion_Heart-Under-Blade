@@ -1,10 +1,12 @@
 package org.camelia.studio.kiss.shot.acerola.commands.audio;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.camelia.studio.kiss.shot.acerola.audio.GuildMusicManager;
 import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
+import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
@@ -31,6 +33,11 @@ public class RepeatCommand implements ISlashCommand {
                 new OptionData(OptionType.STRING, "mode", "Le mode de répétition").addChoice("Toute la queue", "all")
                         .addChoice("La musique actuelle", "one").addChoice("Désactiver la répétition", "off")
                         .setRequired(true));
+    }
+
+    @Override
+    public Optional<ModuleType> requiredModule() {
+        return Optional.of(ModuleType.MUSIC);
     }
 
     @Override
