@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: dind
+    runs-on: ubuntu-latest
     container:
       image: gradle:9.4.1-jdk25
       options: --user root
