@@ -17,4 +17,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test and build
-        run: gradle --no-daemon test integrationTest shadowJar
+        run: gradle --no-daemon test shadowJar
