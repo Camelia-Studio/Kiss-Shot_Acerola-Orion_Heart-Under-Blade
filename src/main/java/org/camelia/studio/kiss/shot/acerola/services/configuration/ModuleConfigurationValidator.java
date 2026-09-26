@@ -132,10 +132,6 @@ public class ModuleConfigurationValidator {
         if (!settings.recentAccountEnabled() && !settings.mentionSpamEnabled()) {
             return ModuleValidationResult.invalid("Au moins une règle anti-raid doit être activée");
         }
-        if (settings.recentAccountTimeout().toSeconds() > ModerationSettings.MAX_TIMEOUT_SECONDS
-                || settings.mentionTimeout().toSeconds() > ModerationSettings.MAX_TIMEOUT_SECONDS) {
-            return ModuleValidationResult.invalid("Une exclusion temporaire ne peut pas dépasser 28 jours");
-        }
         if (settings.recentAccountEnabled()) {
             ModuleValidationResult permission = validateActionPermission(self, settings.recentAccountAction());
             if (!permission.valid()) return permission;
@@ -163,12 +159,6 @@ public class ModuleConfigurationValidator {
         ModerationSettings.AutomaticSanction settings = ModerationSettings.automaticSanction(configuration);
         if (settings.action().isEmpty()) {
             return ModuleValidationResult.invalid("Une action doit être choisie explicitement");
-        }
-        if (settings.timeout().toSeconds() > ModerationSettings.MAX_TIMEOUT_SECONDS) {
-            return ModuleValidationResult.invalid("Une exclusion temporaire ne peut pas dépasser 28 jours");
-        }
-        if (settings.banHistoryDays() > ModerationSettings.MAX_BAN_HISTORY_DAYS) {
-            return ModuleValidationResult.invalid("L'historique supprimé lors d'un bannissement est limité à 7 jours");
         }
         ModuleValidationResult permission = validateActionPermission(self, settings.action().get());
         if (!permission.valid()) return permission;

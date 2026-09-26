@@ -26,11 +26,6 @@ dependencies {
     implementation("club.minnced:jdave-native-linux-aarch64:0.1.8")
     implementation("club.minnced:jdave-native-win-x86-64:0.1.8")
     implementation("club.minnced:jdave-native-darwin:0.1.8")
-    implementation("org.hibernate.orm:hibernate-core:7.3.1.Final")
-    implementation("org.hibernate.orm:hibernate-hikaricp:7.3.1.Final")
-    implementation("org.flywaydb:flyway-core:13.3.0")
-    implementation("org.flywaydb:flyway-database-postgresql:13.3.0")
-    implementation("org.postgresql:postgresql:42.7.10")
     implementation("io.github.cdimascio:dotenv-kotlin:6.5.1")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.2")
     implementation("net.java.dev.jna:jna:5.19.1")
@@ -41,27 +36,7 @@ dependencies {
     implementation("commons-codec:commons-codec:1.22.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
-    testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.3"))
-    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
-    testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-val integrationTest by sourceSets.creating {
-    compileClasspath += sourceSets.main.get().output
-    runtimeClasspath += output + compileClasspath
-}
-
-configurations[integrationTest.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
-configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
-
-tasks.register<Test>("integrationTest") {
-    description = "Exécute les tests d'intégration PostgreSQL avec Testcontainers."
-    group = LifecycleBasePlugin.VERIFICATION_GROUP
-    testClassesDirs = integrationTest.output.classesDirs
-    classpath = integrationTest.runtimeClasspath
-    useJUnitPlatform()
-    shouldRunAfter(tasks.test)
 }
 
 tasks.withType<JavaCompile> {

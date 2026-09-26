@@ -50,8 +50,7 @@ Les commandes sont enregistrées globalement et ne sont utilisables que dans un 
 
 - Java 25 et [JDA 6](https://github.com/discord-jda/JDA) ;
 - [Lavaplayer](https://github.com/lavalink-devs/lavaplayer) pour la lecture audio ;
-- Hibernate, HikariCP et PostgreSQL pour les données ;
-- Flyway pour les migrations de base de données ;
+- l'API Kiss-Shot (HTTP/JSON) pour les données : serveurs, configuration des modules, historique et avertissements ;
 - Gradle et Shadow pour produire un JAR autonome.
 
 ## Installation locale
@@ -59,12 +58,12 @@ Les commandes sont enregistrées globalement et ne sont utilisables que dans un 
 ### Prérequis
 
 - JDK 25 ;
-- Docker avec Docker Compose, ou une instance PostgreSQL accessible ;
+- une instance de l'API Kiss-Shot accessible ;
 - FFmpeg pour l'enregistrement MP3 et le rendu des animations Pixiv.
 
 ### Configuration
 
-Copier le fichier d'exemple, puis renseigner au minimum le jeton Discord et les accès PostgreSQL :
+Copier le fichier d'exemple, puis renseigner au minimum le jeton Discord et l'accès à l'API :
 
 ```bash
 cp .env.example .env
@@ -75,24 +74,18 @@ Les principales variables sont :
 | Variable | Utilisation |
 | --- | --- |
 | `BOT_TOKEN` | Jeton de l'application Discord |
-| `DB_URL`, `DB_USER`, `DB_PASSWORD` | Connexion à PostgreSQL |
-| `ANTI_RAID_*` | Valeurs techniques temporaires de l'anti-raid, avant leur migration dans le ticket dédié |
+| `API_BASE_URL` | URL de l'API Kiss-Shot, préfixe `/api` compris |
+| `API_BOT_TOKEN` | Token statique du bot, envoyé en `Authorization: Bearer` (même valeur que côté API) |
 | `SAUCY_*` | Configuration des aperçus Twitter/X, Pixiv et Misskey |
 | `RECORDING_*` | Configuration des enregistrements vocaux |
 
-Les salons, rôles, états de modules et autres réglages propres à un serveur sont configurés avec `/config` et stockés dans PostgreSQL. La liste complète des variables globales et leurs valeurs par défaut se trouve dans [`.env.example`](.env.example).
+Les salons, rôles, états de modules et autres réglages propres à un serveur sont configurés avec `/config` et stockés par l'API Kiss-Shot. La liste complète des variables globales et leurs valeurs par défaut se trouve dans [`.env.example`](.env.example).
 
-### Base de données
+### Données et API
 
-La configuration Docker expose PostgreSQL sur le port local `5434` :
+Le bot ne se connecte plus à une base de données : toute la persistance passe par l'API Kiss-Shot, qui gère le schéma et ses migrations. Le bot vérifie au démarrage que `API_BASE_URL` et `API_BOT_TOKEN` sont renseignés.
 
-```bash
-docker compose up -d
-```
-
-Flyway applique automatiquement les migrations versionnées au démarrage, avant qu'Hibernate valide le schéma. Hibernate ne crée ni ne modifie les tables.
-
-Pour la première mise à jour d'une base historique, conserver temporairement `GUILD_ID` dans `.env` : Flyway l'utilise pour rattacher les avertissements existants et les anciens réglages de modules à leur serveur. La migration V3 reconnaît également `DEFAULT_ROLE_ID`, `LOG_CHANNEL_ID`, `AUTO_BAN_CHANNEL_IDS`, `AUTO_BAN_ROLE_IDS`, `AUTO_BAN_EXEMPT_ROLE_IDS` et `NO_EMBED_CHANNEL_IDS`. Tous les modules migrés restent désactivés. Ces variables peuvent être supprimées après la migration et ne sont pas nécessaires sur une base vide.
+L'API ne connaît pas l'état de Discord : la validation qui en dépend (existence des salons et rôles, permissions du bot) reste dans le bot, qui n'envoie `ACTIVE` qu'une fois celle-ci réussie et suspend lui-même un module dont la validation échoue. La configuration lue est gardée 30 secondes en mémoire, ce qui laisse une modification faite depuis le backoffice devenir visible rapidement.
 
 ### Compilation et lancement
 
@@ -105,24 +98,21 @@ java -jar build/libs/kiss-shot-acerola.jar
 ### Tests
 
 ```bash
-# Suite unitaire
 ./gradlew test
-
-# Migrations et isolation multi-serveurs sur PostgreSQL réel (Docker requis)
-./gradlew integrationTest
 ```
 
-La CI exécute les deux suites avant de construire le fat JAR.
+Les appels à l'API sont testés contre un faux serveur HTTP local : aucune API ni base de données n'est nécessaire. La CI exécute cette suite avant de construire le fat JAR.
 
 ## Architecture et contribution
 
 Le projet découvre automatiquement ses composants par réflexion au démarrage :
 
 - les implémentations de `ISlashCommand` placées dans `commands/**` ;
-- les sous-classes de `ListenerAdapter` placées dans `listeners/global/**` ;
-- les entités implémentant `IEntity` placées dans `models/**`.
+- les sous-classes de `ListenerAdapter` placées dans `listeners/global/**`.
 
-Une nouvelle commande, un nouveau listener ou une nouvelle entité n'a donc pas besoin d'être enregistré manuellement s'il respecte cette organisation.
+Une nouvelle commande ou un nouveau listener n'a donc pas besoin d'être enregistré manuellement s'il respecte cette organisation.
+
+Les échanges avec l'API sont regroupés dans `api/` : `ApiClient` (HTTP, authentification, erreurs) et un client par ressource (`ServerApi`, `ModuleApi`, `AvertoApi`). Les services (`services/`) s'appuient dessus.
 
 ## Crédits
 

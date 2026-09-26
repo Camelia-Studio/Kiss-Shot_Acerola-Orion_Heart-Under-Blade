@@ -19,25 +19,25 @@ public final class ModerationSettings {
     public static AntiRaid antiRaid(ModuleConfiguration configuration) {
         Map<ModuleSetting, String> values = configuration.settings();
         return new AntiRaid(
-                bool(values, ModuleSetting.ANTI_RECENT_ENABLED, true),
-                positiveInt(values, ModuleSetting.ANTI_RECENT_MAX_AGE_DAYS, 7),
-                action(values, ModuleSetting.ANTI_RECENT_ACTION).orElse(SanctionAction.KICK),
-                duration(values, ModuleSetting.ANTI_RECENT_TIMEOUT_SECONDS, 600),
-                bool(values, ModuleSetting.ANTI_MENTION_ENABLED, true),
-                positiveInt(values, ModuleSetting.ANTI_MENTION_LIMIT, 5),
-                duration(values, ModuleSetting.ANTI_MENTION_WINDOW_SECONDS, 10),
-                action(values, ModuleSetting.ANTI_MENTION_ACTION).orElse(SanctionAction.TIMEOUT),
-                duration(values, ModuleSetting.ANTI_MENTION_TIMEOUT_SECONDS, 600),
-                bool(values, ModuleSetting.ANTI_MENTION_DELETE_MESSAGE, false));
+                bool(values, ModuleSetting.ANTI_RECENT_ENABLED),
+                positiveInt(values, ModuleSetting.ANTI_RECENT_MAX_AGE_DAYS),
+                requiredAction(values, ModuleSetting.ANTI_RECENT_ACTION),
+                duration(values, ModuleSetting.ANTI_RECENT_TIMEOUT_SECONDS),
+                bool(values, ModuleSetting.ANTI_MENTION_ENABLED),
+                positiveInt(values, ModuleSetting.ANTI_MENTION_LIMIT),
+                duration(values, ModuleSetting.ANTI_MENTION_WINDOW_SECONDS),
+                requiredAction(values, ModuleSetting.ANTI_MENTION_ACTION),
+                duration(values, ModuleSetting.ANTI_MENTION_TIMEOUT_SECONDS),
+                bool(values, ModuleSetting.ANTI_MENTION_DELETE_MESSAGE));
     }
 
     public static AutomaticSanction automaticSanction(ModuleConfiguration configuration) {
         Map<ModuleSetting, String> values = configuration.settings();
         return new AutomaticSanction(
-                action(values, ModuleSetting.SANCTION_ACTION),
-                duration(values, ModuleSetting.SANCTION_TIMEOUT_SECONDS, 600),
-                nonNegativeInt(values, ModuleSetting.SANCTION_BAN_HISTORY_DAYS, 0),
-                bool(values, ModuleSetting.SANCTION_DELETE_MESSAGE, false));
+                optionalAction(values, ModuleSetting.SANCTION_ACTION),
+                duration(values, ModuleSetting.SANCTION_TIMEOUT_SECONDS),
+                nonNegativeInt(values, ModuleSetting.SANCTION_BAN_HISTORY_DAYS),
+                bool(values, ModuleSetting.SANCTION_DELETE_MESSAGE));
     }
 
     public static Map<ModuleSetting, String> recentAccountValues(
@@ -86,7 +86,19 @@ public final class ModerationSettings {
         return Map.copyOf(values);
     }
 
-    private static Optional<SanctionAction> action(Map<ModuleSetting, String> values, ModuleSetting key) {
+    /**
+     * L'API renvoie toujours les réglages avec leurs valeurs par défaut : seul {@code SANCTION_ACTION}
+     * peut être absent. Toute autre clé manquante est une réponse incohérente.
+     */
+    private static String required(Map<ModuleSetting, String> values, ModuleSetting key) {
+        String raw = values.get(key);
+        if (raw == null) {
+            throw new IllegalArgumentException("Réglage manquant : " + key);
+        }
+        return raw;
+    }
+
+    private static Optional<SanctionAction> optionalAction(Map<ModuleSetting, String> values, ModuleSetting key) {
         String raw = values.get(key);
         if (raw == null || raw.isBlank()) {
             return Optional.empty();
@@ -94,38 +106,41 @@ public final class ModerationSettings {
         return Optional.of(SanctionAction.valueOf(raw));
     }
 
-    private static boolean bool(Map<ModuleSetting, String> values, ModuleSetting key, boolean fallback) {
-        String raw = values.get(key);
-        if (raw == null) return fallback;
+    private static SanctionAction requiredAction(Map<ModuleSetting, String> values, ModuleSetting key) {
+        return SanctionAction.valueOf(required(values, key));
+    }
+
+    private static boolean bool(Map<ModuleSetting, String> values, ModuleSetting key) {
+        String raw = required(values, key);
         if (!raw.equalsIgnoreCase("true") && !raw.equalsIgnoreCase("false")) {
             throw new IllegalArgumentException("Réglage booléen invalide : " + key);
         }
         return Boolean.parseBoolean(raw);
     }
 
-    private static int positiveInt(Map<ModuleSetting, String> values, ModuleSetting key, int fallback) {
-        int value = integer(values, key, fallback);
+    private static int positiveInt(Map<ModuleSetting, String> values, ModuleSetting key) {
+        int value = integer(values, key);
         if (value <= 0) {
             throw new IllegalArgumentException("Le réglage " + key + " doit être positif");
         }
         return value;
     }
 
-    private static int nonNegativeInt(Map<ModuleSetting, String> values, ModuleSetting key, int fallback) {
-        int value = integer(values, key, fallback);
+    private static int nonNegativeInt(Map<ModuleSetting, String> values, ModuleSetting key) {
+        int value = integer(values, key);
         if (value < 0) {
             throw new IllegalArgumentException("Le réglage " + key + " ne peut pas être négatif");
         }
         return value;
     }
 
-    private static Duration duration(Map<ModuleSetting, String> values, ModuleSetting key, int fallbackSeconds) {
-        return Duration.ofSeconds(positiveInt(values, key, fallbackSeconds));
+    private static Duration duration(Map<ModuleSetting, String> values, ModuleSetting key) {
+        return Duration.ofSeconds(positiveInt(values, key));
     }
 
-    private static int integer(Map<ModuleSetting, String> values, ModuleSetting key, int fallback) {
+    private static int integer(Map<ModuleSetting, String> values, ModuleSetting key) {
         try {
-            return Integer.parseInt(values.getOrDefault(key, String.valueOf(fallback)));
+            return Integer.parseInt(required(values, key));
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Réglage numérique invalide : " + key, exception);
         }

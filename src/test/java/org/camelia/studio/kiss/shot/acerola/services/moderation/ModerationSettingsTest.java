@@ -10,9 +10,18 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModerationSettingsTest {
+    @Test
+    void aMissingSettingIsAnInconsistentApiResponse() {
+        ModuleConfiguration withoutSettings = new ModuleConfiguration(
+                ModuleType.ANTI_RAID, ModuleStatus.DISABLED, null, null, Map.of(), Map.of());
+
+        assertThrows(IllegalArgumentException.class, () -> ModerationSettings.antiRaid(withoutSettings));
+    }
+
     @Test
     void antiRaidDefaultsMatchTheSpecification() {
         ModerationSettings.AntiRaid settings = ModerationSettings.antiRaid(configuration(ModuleType.ANTI_RAID));
@@ -58,6 +67,7 @@ class ModerationSettingsTest {
                 null,
                 null,
                 Map.of(),
-                Map.of());
+                Map.of(),
+                ApiDefaults.settings(module));
     }
 }

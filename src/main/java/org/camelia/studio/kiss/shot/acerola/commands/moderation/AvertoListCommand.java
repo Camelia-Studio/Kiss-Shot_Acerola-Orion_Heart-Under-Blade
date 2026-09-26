@@ -17,8 +17,12 @@ import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AvertoListCommand implements ISlashCommand {
+
+    private static final Logger logger = LoggerFactory.getLogger(AvertoListCommand.class);
 
     @Override
     public String getName() {
@@ -64,11 +68,18 @@ public class AvertoListCommand implements ISlashCommand {
         List<Averto> avertos = null;
         String guildId = event.getGuild().getId();
 
-        if (option != null) {
-            member = option.getAsMember();
-            avertos = AvertoService.getInstance().getLatestAvertosForUser(guildId, member.getId(), 10);
-        } else {
-            avertos = AvertoService.getInstance().getLatestAvertos(guildId, 10);
+        try {
+            if (option != null) {
+                member = option.getAsMember();
+                avertos = AvertoService.getInstance().getLatestAvertosForUser(guildId, member.getId(), 10);
+            } else {
+                avertos = AvertoService.getInstance().getLatestAvertos(guildId, 10);
+            }
+        } catch (RuntimeException exception) {
+            logger.error("Impossible de récupérer les avertissements du serveur {}", guildId, exception);
+            event.getHook().editOriginal("Les avertissements sont temporairement indisponibles. Réessayez plus tard.")
+                    .queue();
+            return;
         }
         /*
          * 2 possibilités :
@@ -88,17 +99,17 @@ public class AvertoListCommand implements ISlashCommand {
                 break;
             }
             // On récupère le membre Discord de l'utilisateur
-            Member discordUser = event.getGuild().getMemberById(averto.getUser().getDiscordId());
-            Member moderator = event.getGuild().getMemberById(averto.getModerator().getDiscordId());
+            Member discordUser = event.getGuild().getMemberById(averto.userId());
+            Member moderator = event.getGuild().getMemberById(averto.moderatorId());
             embedBuilder.addField(
-                    "Avertissement #" + averto.getId(),
+                    "Avertissement #" + averto.id(),
                     (discordUser != null ? "Utilisateur : " + discordUser.getAsMention() + "\n" : "") +
-                            "Raison : " + averto.getReason() + "\n" +
+                            "Raison : " + averto.reason() + "\n" +
                             (moderator != null ? "Modérateur : " + moderator.getAsMention() : "") + "\n" +
                             "Date : "
-                            + "<t:" + averto.getCreatedAt().getEpochSecond() + ":f>" +
+                            + "<t:" + averto.createdAt().getEpochSecond() + ":f>" +
                             "\n" +
-                            "Preuve : " + (averto.getFile() != null ? averto.getFile() : "Aucune"),
+                            "Preuve : " + (averto.file() != null ? averto.file() : "Aucune"),
                     false);
         }
 

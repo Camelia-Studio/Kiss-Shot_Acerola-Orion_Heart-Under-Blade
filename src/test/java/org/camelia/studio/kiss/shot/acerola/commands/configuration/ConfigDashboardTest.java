@@ -6,6 +6,7 @@ import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
+import org.camelia.studio.kiss.shot.acerola.services.moderation.ApiDefaults;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -136,7 +137,8 @@ class ConfigDashboardTest {
                         module == selected
                                 ? Map.of(ModuleResourcePurpose.PROTECTED, Set.of("456"))
                                 : Map.of(),
-                        Map.of()))
+                        Map.of(),
+                        ApiDefaults.settings(module)))
                 .toList();
     }
 }

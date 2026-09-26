@@ -1,14 +1,19 @@
 package org.camelia.studio.kiss.shot.acerola.services.configuration;
 
 import net.dv8tion.jda.api.entities.Guild;
+import org.camelia.studio.kiss.shot.acerola.api.ApiClient;
+import org.camelia.studio.kiss.shot.acerola.api.ApiException;
+import org.camelia.studio.kiss.shot.acerola.api.ModuleApi;
+import org.camelia.studio.kiss.shot.acerola.api.ServerApi;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
-import org.camelia.studio.kiss.shot.acerola.repositories.ServerConfigurationRepository;
-import org.camelia.studio.kiss.shot.acerola.services.DiscordServerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -20,27 +25,40 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ModuleConfigurationService {
     private static final Logger logger = LoggerFactory.getLogger(ModuleConfigurationService.class);
     private static final String SYSTEM_ACTOR = "SYSTEM_VALIDATION";
+    /**
+     * Durée courte : une modification faite depuis le backoffice doit rester visible rapidement.
+     */
+    private static final Duration CACHE_TTL = Duration.ofSeconds(30);
     private static ModuleConfigurationService instance;
 
-    private final ServerConfigurationRepository repository;
+    private final ModuleApi moduleApi;
+    private final ServerApi serverApi;
     private final ModuleConfigurationValidator validator;
-    private final Map<CacheKey, ModuleConfiguration> cache = new ConcurrentHashMap<>();
+    private final Clock clock;
+    private final Map<CacheKey, CachedConfiguration> cache = new ConcurrentHashMap<>();
 
     public static synchronized ModuleConfigurationService getInstance() {
         if (instance == null) {
+            ApiClient client = ApiClient.getInstance();
             instance = new ModuleConfigurationService(
-                    new ServerConfigurationRepository(),
-                    new ModuleConfigurationValidator());
+                    new ModuleApi(client),
+                    new ServerApi(client),
+                    new ModuleConfigurationValidator(),
+                    Clock.systemUTC());
         }
         return instance;
     }
 
     ModuleConfigurationService(
-            ServerConfigurationRepository repository,
-            ModuleConfigurationValidator validator
+            ModuleApi moduleApi,
+            ServerApi serverApi,
+            ModuleConfigurationValidator validator,
+            Clock clock
     ) {
-        this.repository = repository;
+        this.moduleApi = moduleApi;
+        this.serverApi = serverApi;
         this.validator = validator;
+        this.clock = clock;
     }
 
     public ModuleAccessResult checkAccess(Guild guild, ModuleType module) {
@@ -70,12 +88,11 @@ public class ModuleConfigurationService {
     }
 
     public synchronized List<ModuleConfiguration> list(Guild guild) {
-        DiscordServerService.getInstance().register(guild.getId());
-        List<ModuleConfiguration> configurations = repository.findAll(guild.getId());
+        List<ModuleConfiguration> configurations = moduleApi.findAll(guild.getId());
         List<ModuleConfiguration> resolved = new ArrayList<>();
         for (ModuleConfiguration configuration : configurations) {
             ModuleConfiguration validated = validateActive(guild, configuration);
-            cache.put(new CacheKey(guild.getId(), configuration.module()), validated);
+            putInCache(guild.getId(), validated);
             resolved.add(validated);
         }
         resolved.sort(Comparator.comparing(configuration -> configuration.module().ordinal()));
@@ -112,11 +129,16 @@ public class ModuleConfigurationService {
             return ConfigurationOperationResult.failure("Activation refusée : " + validation.reason() + ".");
         }
 
-        ModuleConfiguration active = repository.activate(guild.getId(), candidate, actorId);
-        if (sharedConfigurationChanged(current, candidate)) {
-            cache.keySet().removeIf(key -> key.guildId().equals(guild.getId()));
+        ModuleConfiguration active;
+        try {
+            active = moduleApi.configure(guild.getId(), module, settings, ModuleStatus.ACTIVE, null, actorId);
+        } catch (ApiException exception) {
+            return rejected("Activation refusée : ", exception);
         }
-        cache.put(new CacheKey(guild.getId(), module), active);
+        if (sharedConfigurationChanged(current, candidate)) {
+            evictGuild(guild.getId());
+        }
+        putInCache(guild.getId(), active);
         return ConfigurationOperationResult.success("Le module est maintenant actif.");
     }
 
@@ -132,26 +154,26 @@ public class ModuleConfigurationService {
         }
 
         ModuleConfiguration candidate = settings.applyTo(current);
-        ModuleStatus status = current.status();
-        String suspensionReason = current.suspensionReason();
+        ModuleStatus status = null;
+        String suspensionReason = null;
         ModuleValidationResult validation = validator.validate(guild, candidate);
         boolean suspendedByChange = false;
-        if (status == ModuleStatus.ACTIVE && !validation.valid()) {
+        if (current.status() == ModuleStatus.ACTIVE && !validation.valid()) {
             status = ModuleStatus.SUSPENDED;
             suspensionReason = validation.reason();
             suspendedByChange = true;
         }
 
-        ModuleConfiguration configured = repository.configure(
-                guild.getId(),
-                candidate,
-                status,
-                suspensionReason,
-                actorId);
-        if (sharedConfigurationChanged(current, candidate)) {
-            cache.keySet().removeIf(key -> key.guildId().equals(guild.getId()));
+        ModuleConfiguration configured;
+        try {
+            configured = moduleApi.configure(guild.getId(), module, settings, status, suspensionReason, actorId);
+        } catch (ApiException exception) {
+            return rejected("Configuration refusée : ", exception);
         }
-        cache.put(new CacheKey(guild.getId(), module), configured);
+        if (sharedConfigurationChanged(current, candidate)) {
+            evictGuild(guild.getId());
+        }
+        putInCache(guild.getId(), configured);
 
         if (suspendedByChange) {
             return ConfigurationOperationResult.success(
@@ -177,9 +199,9 @@ public class ModuleConfigurationService {
         if (loadFresh(guild, module).isEmpty()) {
             return ConfigurationOperationResult.failure("Configuration de module introuvable.");
         }
-        ModuleConfiguration disabled = repository.changeStatus(
+        ModuleConfiguration disabled = moduleApi.changeStatus(
                 guild.getId(), module, ModuleStatus.DISABLED, null, actorId);
-        cache.put(new CacheKey(guild.getId(), module), disabled);
+        putInCache(guild.getId(), disabled);
         return ConfigurationOperationResult.success(
                 "Le module est désactivé. Ses réglages sont conservés.");
     }
@@ -200,15 +222,19 @@ public class ModuleConfigurationService {
 
         ModuleValidationResult validation = validator.validate(guild, current);
         if (!validation.valid()) {
-            current = repository.changeStatus(
+            current = moduleApi.changeStatus(
                     guild.getId(), module, ModuleStatus.SUSPENDED, validation.reason(), SYSTEM_ACTOR);
-            cache.put(new CacheKey(guild.getId(), module), current);
+            putInCache(guild.getId(), current);
             return ConfigurationOperationResult.failure("Validation échouée : " + validation.reason() + ".");
         }
 
-        ModuleConfiguration active = repository.changeStatus(
-                guild.getId(), module, ModuleStatus.ACTIVE, null, actorId);
-        cache.put(new CacheKey(guild.getId(), module), active);
+        ModuleConfiguration active;
+        try {
+            active = moduleApi.changeStatus(guild.getId(), module, ModuleStatus.ACTIVE, null, actorId);
+        } catch (ApiException exception) {
+            return rejected("Validation échouée : ", exception);
+        }
+        putInCache(guild.getId(), active);
         return ConfigurationOperationResult.success("Le module est valide et actif.");
     }
 
@@ -222,9 +248,12 @@ public class ModuleConfigurationService {
             return ConfigurationOperationResult.failure(validation.reason() + ".");
         }
 
-        DiscordServerService.getInstance().register(guild.getId());
-        repository.setLogChannel(guild.getId(), channelId, actorId);
-        cache.keySet().removeIf(key -> key.guildId().equals(guild.getId()));
+        try {
+            serverApi.setLogChannel(guild.getId(), channelId, actorId);
+        } catch (ApiException exception) {
+            return rejected("", exception);
+        }
+        evictGuild(guild.getId());
         list(guild);
         return ConfigurationOperationResult.success(channelId == null
                 ? "Le salon de logs a été supprimé. Les modules qui en dépendent ont été suspendus."
@@ -235,10 +264,14 @@ public class ModuleConfigurationService {
         cache.keySet().removeIf(key -> key.guildId().equals(guildId));
     }
 
-    private synchronized Optional<ModuleConfiguration> resolve(Guild guild, ModuleType module) {
-        CacheKey key = new CacheKey(guild.getId(), module);
-        ModuleConfiguration configuration = cache.get(key);
+    /**
+     * Volontairement sans verrou : les listeners l'appellent à chaque événement, et un appel HTTP lent ou en
+     * timeout ne doit pas bloquer les autres serveurs. Deux lectures simultanées d'une entrée expirée sont
+     * inoffensives (GET idempotent).
+     */
+    private Optional<ModuleConfiguration> resolve(Guild guild, ModuleType module) {
         try {
+            ModuleConfiguration configuration = cached(guild.getId(), module);
             if (configuration == null) {
                 configuration = loadFresh(guild, module).orElse(null);
             }
@@ -247,7 +280,7 @@ public class ModuleConfigurationService {
             }
 
             ModuleConfiguration validated = validateActive(guild, configuration);
-            cache.put(key, validated);
+            putInCache(guild.getId(), validated);
             return Optional.of(validated);
         } catch (RuntimeException exception) {
             logger.error(
@@ -260,9 +293,8 @@ public class ModuleConfigurationService {
     }
 
     private Optional<ModuleConfiguration> loadFresh(Guild guild, ModuleType module) {
-        DiscordServerService.getInstance().register(guild.getId());
-        Optional<ModuleConfiguration> configuration = repository.find(guild.getId(), module);
-        configuration.ifPresent(value -> cache.put(new CacheKey(guild.getId(), module), value));
+        Optional<ModuleConfiguration> configuration = moduleApi.find(guild.getId(), module);
+        configuration.ifPresent(value -> putInCache(guild.getId(), value));
         return configuration;
     }
 
@@ -281,12 +313,42 @@ public class ModuleConfigurationService {
                 configuration.module(),
                 guild.getId(),
                 validation.reason());
-        return repository.changeStatus(
+        return moduleApi.changeStatus(
                 guild.getId(),
                 configuration.module(),
                 ModuleStatus.SUSPENDED,
                 validation.reason(),
                 SYSTEM_ACTOR);
+    }
+
+    /**
+     * Une requête refusée par l'API (422) devient un échec présentable à l'administrateur ;
+     * toute autre erreur reste une indisponibilité et remonte.
+     */
+    private ConfigurationOperationResult rejected(String prefix, ApiException exception) {
+        if (!exception.isInvalidRequest()) {
+            throw exception;
+        }
+        return ConfigurationOperationResult.failure(prefix + exception.describe());
+    }
+
+    private ModuleConfiguration cached(String guildId, ModuleType module) {
+        CacheKey key = new CacheKey(guildId, module);
+        CachedConfiguration entry = cache.get(key);
+        if (entry == null) {
+            return null;
+        }
+        if (!entry.expiresAt().isAfter(Instant.now(clock))) {
+            cache.remove(key, entry);
+            return null;
+        }
+        return entry.configuration();
+    }
+
+    private void putInCache(String guildId, ModuleConfiguration configuration) {
+        cache.put(
+                new CacheKey(guildId, configuration.module()),
+                new CachedConfiguration(configuration, Instant.now(clock).plus(CACHE_TTL)));
     }
 
     private boolean sharedConfigurationChanged(
@@ -300,5 +362,8 @@ public class ModuleConfigurationService {
     }
 
     private record CacheKey(String guildId, ModuleType module) {
+    }
+
+    private record CachedConfiguration(ModuleConfiguration configuration, Instant expiresAt) {
     }
 }
