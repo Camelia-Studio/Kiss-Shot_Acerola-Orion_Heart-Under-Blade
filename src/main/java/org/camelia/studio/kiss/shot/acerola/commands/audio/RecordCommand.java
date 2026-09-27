@@ -4,7 +4,6 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -16,6 +15,7 @@ import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingDiscordU
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingMode;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingStatus;
+import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingStopOutcome;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingStopResult;
 
 import java.util.List;
@@ -73,7 +73,7 @@ public class RecordCommand implements ISlashCommand {
         String action = event.getOption("action").getAsString();
         switch (action) {
             case ACTION_START -> start(event, member);
-            case ACTION_STOP -> stop(event);
+            case ACTION_STOP -> stop(event, member);
             case ACTION_STATUS -> status(event);
             default -> event.reply("Action inconnue.").setEphemeral(true).queue();
         }
@@ -110,15 +110,15 @@ public class RecordCommand implements ISlashCommand {
         }
     }
 
-    private void stop(SlashCommandInteractionEvent event) {
+    private void stop(SlashCommandInteractionEvent event, Member member) {
         event.deferReply().queue();
         try {
-            RecordingStopResult result = recordingService.stopRecording(event.getGuild());
+            RecordingStopOutcome outcome = recordingService.stopRecording(event.getGuild(), member);
+            RecordingStopResult result = outcome.result();
             event.getHook().editOriginal("Enregistrement arrêté. Envoi des fichiers MP3 en cours...").queue();
             String message = "Enregistrement terminé pour `%s` en mode `%s`. Durée: %s."
                     .formatted(result.channelName(), label(result.mode()), RecordingService.formatDuration(result.duration()));
-            GuildMessageChannel channel = event.getChannel().asGuildMessageChannel();
-            RecordingDiscordUploader.upload(channel, result, message, failure ->
+            RecordingDiscordUploader.upload(outcome.outputChannel(), result, message, failure ->
                     event.getHook().editOriginal("Enregistrement terminé, mais l'envoi Discord a échoué: "
                                     + failure.getMessage())
                             .queue());

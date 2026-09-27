@@ -20,6 +20,8 @@ import org.camelia.studio.kiss.shot.acerola.utils.URLFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -93,6 +95,12 @@ public class MsgSendCommand implements ISlashCommand {
         }
 
         GuildMessageChannel channel = selectedChannel.asGuildMessageChannel();
+        if (!hasChannelSendPermission(event.getMember(), channel)) {
+            event.reply("Vous ne possédez pas les permissions nécessaires dans ce salon.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
         if (!hasBotPermissions(event.getGuild().getSelfMember(), channel, attachment != null, false)) {
             event.reply("Je ne possède pas les permissions nécessaires dans ce salon.")
                     .setEphemeral(true)
@@ -109,6 +117,7 @@ public class MsgSendCommand implements ISlashCommand {
             if (message != null && embed != null) {
                 action.setEmbeds(embed);
             }
+            action.setAllowedMentions(allowedMentionsFor(event.getMember(), channel));
             action.queue(
                     success -> event.getHook().editOriginal("Message envoyé !").queue(),
                     error -> {
@@ -134,15 +143,30 @@ public class MsgSendCommand implements ISlashCommand {
             boolean embeds,
             boolean history
     ) {
-        Permission sendPermission = channel.getType().isThread()
-                ? Permission.MESSAGE_SEND_IN_THREADS
-                : Permission.MESSAGE_SEND;
-        if (!self.hasPermission(channel, Permission.VIEW_CHANNEL, sendPermission)) {
+        if (!hasChannelSendPermission(self, channel)) {
             return false;
         }
         if (embeds && !self.hasPermission(channel, Permission.MESSAGE_EMBED_LINKS)) {
             return false;
         }
         return !history || self.hasPermission(channel, Permission.MESSAGE_HISTORY);
+    }
+
+    static boolean hasChannelSendPermission(Member member, GuildMessageChannel channel) {
+        Permission sendPermission = channel.getType().isThread()
+                ? Permission.MESSAGE_SEND_IN_THREADS
+                : Permission.MESSAGE_SEND;
+        return member.hasPermission(channel, Permission.VIEW_CHANNEL, sendPermission);
+    }
+
+    static boolean hasChannelManagePermission(Member member, GuildMessageChannel channel) {
+        return member.hasPermission(channel, Permission.VIEW_CHANNEL, Permission.MESSAGE_MANAGE);
+    }
+
+    static Collection<Message.MentionType> allowedMentionsFor(Member member, GuildMessageChannel channel) {
+        if (member.hasPermission(channel, Permission.MESSAGE_MENTION_EVERYONE)) {
+            return EnumSet.allOf(Message.MentionType.class);
+        }
+        return List.of(Message.MentionType.USER);
     }
 }

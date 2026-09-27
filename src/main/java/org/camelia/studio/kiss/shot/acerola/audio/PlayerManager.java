@@ -88,7 +88,9 @@ public class PlayerManager {
             public void trackLoaded(AudioTrack track) {
                 withCurrentManager(channel.getGuild(), musicManager, () -> {
                     musicManager.scheduler.queue(track);
-                    channel.sendMessage("Ajout à la file d'attente: `" + track.getInfo().title + "`").queue();
+                    channel.sendMessage("Ajout à la file d'attente: `" + track.getInfo().title + "`")
+                            .setAllowedMentions(List.of())
+                            .queue();
                 });
             }
 
@@ -99,6 +101,7 @@ public class PlayerManager {
                     channel.sendMessage(
                             "Ajout à la file d'attente: `" + playlist.getName() + "` - "
                                     + tracks.size() + " musiques.")
+                            .setAllowedMentions(List.of())
                             .queue();
                     for (AudioTrack track : tracks) {
                         musicManager.scheduler.queue(track);
@@ -111,7 +114,9 @@ public class PlayerManager {
                 withCurrentManager(
                         channel.getGuild(),
                         musicManager,
-                        () -> channel.sendMessage("Aucun résultat trouvé pour: " + url).queue());
+                        () -> channel.sendMessage("Aucun résultat trouvé pour: " + url)
+                                .setAllowedMentions(List.of())
+                                .queue());
             }
 
             @Override
@@ -119,7 +124,9 @@ public class PlayerManager {
                 withCurrentManager(
                         channel.getGuild(),
                         musicManager,
-                        () -> channel.sendMessage("Erreur lors du chargement: " + e.getMessage()).queue());
+                        () -> channel.sendMessage("Erreur lors du chargement: " + e.getMessage())
+                                .setAllowedMentions(List.of())
+                                .queue());
             }
         });
     }

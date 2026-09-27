@@ -1,8 +1,10 @@
 package org.camelia.studio.kiss.shot.acerola.services.recording;
 
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.audio.hooks.ConnectionListener;
 import net.dv8tion.jda.api.audio.hooks.ConnectionStatus;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.concrete.StageChannel;
@@ -111,7 +113,39 @@ public class RecordingService {
         refreshEmptyChannelTimeout(guild);
     }
 
-    public synchronized RecordingStopResult stopRecording(Guild guild) throws IOException {
+    public synchronized RecordingStopOutcome stopRecording(Guild guild, Member requester) throws IOException {
+        ActiveRecording activeRecording = recordings.get(guild.getIdLong());
+        if (activeRecording == null) {
+            throw new RecordingStateException("Aucun enregistrement n'est en cours sur ce serveur.");
+        }
+        if (!canStop(activeRecording, requester)) {
+            throw new RecordingStateException(
+                    "Seul l'auteur de l'enregistrement, un membre du salon vocal enregistré ou un administrateur "
+                            + "peut arrêter cet enregistrement.");
+        }
+
+        RecordingStopResult result = stopRecordingInternal(guild);
+        return new RecordingStopOutcome(result, activeRecording.outputChannel());
+    }
+
+    private boolean canStop(ActiveRecording activeRecording, Member requester) {
+        if (requester == null) {
+            return false;
+        }
+        if (requester.getIdLong() == activeRecording.startedById()) {
+            return true;
+        }
+        if (requester.hasPermission(Permission.ADMINISTRATOR)) {
+            return true;
+        }
+
+        GuildVoiceState voiceState = requester.getVoiceState();
+        return voiceState != null
+                && voiceState.inAudioChannel()
+                && voiceState.getChannel().getIdLong() == activeRecording.channelId();
+    }
+
+    private synchronized RecordingStopResult stopRecordingInternal(Guild guild) throws IOException {
         long guildId = guild.getIdLong();
         ActiveRecording activeRecording = recordings.remove(guildId);
         if (activeRecording == null) {
@@ -236,7 +270,7 @@ public class RecordingService {
         }
 
         try {
-            RecordingStopResult result = stopRecording(guild);
+            RecordingStopResult result = stopRecordingInternal(guild);
             String message = "Salon vocal vide depuis %d secondes, enregistrement arrêté. Durée: %s."
                     .formatted(config.emptyChannelTimeout().toSeconds(), formatDuration(result.duration()));
             RecordingDiscordUploader.upload(activeRecording.outputChannel(), result, message, failure ->

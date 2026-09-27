@@ -94,6 +94,12 @@ public class MsgEditCommand implements ISlashCommand {
         }
 
         GuildMessageChannel channel = selectedChannel.asGuildMessageChannel();
+        if (!MsgSendCommand.hasChannelManagePermission(event.getMember(), channel)) {
+            event.reply("Vous ne possédez pas les permissions nécessaires dans ce salon.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
         if (!MsgSendCommand.hasBotPermissions(
                 event.getGuild().getSelfMember(),
                 channel,
@@ -131,6 +137,8 @@ public class MsgEditCommand implements ISlashCommand {
 
         var action = found.editMessage(message == null ? found.getContentRaw() : message.getAsString());
         action.setEmbeds(embed == null ? found.getEmbeds() : List.of(embed));
+        action.setAllowedMentions(
+                MsgSendCommand.allowedMentionsFor(event.getMember(), found.getChannel().asGuildMessageChannel()));
         action.queue(
                 success -> event.getHook().editOriginal("Message modifié !").queue(),
                 error -> {
