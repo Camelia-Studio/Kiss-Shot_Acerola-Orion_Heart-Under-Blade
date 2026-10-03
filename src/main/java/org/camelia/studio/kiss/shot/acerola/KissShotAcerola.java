@@ -2,7 +2,7 @@ package org.camelia.studio.kiss.shot.acerola;
 
 import club.minnced.discord.jdave.interop.JDaveSessionFactory;
 import net.dv8tion.jda.api.audio.AudioModuleConfig;
-import org.camelia.studio.kiss.shot.acerola.db.HibernateConfig;
+import org.camelia.studio.kiss.shot.acerola.api.ApiClient;
 import org.camelia.studio.kiss.shot.acerola.listeners.bot.ReadyListener;
 import org.camelia.studio.kiss.shot.acerola.managers.ListenerManager;
 import org.camelia.studio.kiss.shot.acerola.utils.Configuration;
@@ -23,7 +23,7 @@ public class KissShotAcerola {
         try {
             Configuration.getInstance();
             OpusNativeLibraryLoader.preloadFromEnvironment();
-            HibernateConfig.getSessionFactory();
+            ApiClient.getInstance();
 
             jda = JDABuilder.createDefault(Configuration.getInstance().getDotenv().get("BOT_TOKEN"))
                     .addEventListeners(new ReadyListener())
@@ -37,10 +37,7 @@ public class KissShotAcerola {
 
             new ListenerManager().registerListeners(jda);
 
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                HibernateConfig.shutdown();
-                jda.shutdown();
-            }));
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> jda.shutdown()));
         } catch (Exception e) {
             logger.error("Une erreur est survenue lors de l'exécution du bot : {}", e.getMessage());
             System.exit(1);

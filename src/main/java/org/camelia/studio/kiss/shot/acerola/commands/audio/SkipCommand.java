@@ -27,10 +27,15 @@ public class SkipCommand implements ISlashCommand {
         return "Permet de passer à la musique suivante";
     }
 
+    private static final int MAX_SKIP_AMOUNT = 1000;
+
     @Override
     public List<OptionData> getOptions() {
         return List.of(
-                new OptionData(OptionType.INTEGER, "tracknumber", "Nombre de musique à passer").setRequired(false));
+                new OptionData(OptionType.INTEGER, "tracknumber", "Nombre de musique à passer")
+                        .setRequired(false)
+                        .setMinValue(1)
+                        .setMaxValue(MAX_SKIP_AMOUNT));
     }
 
     @Override

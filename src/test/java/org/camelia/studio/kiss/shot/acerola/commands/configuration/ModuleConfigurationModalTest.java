@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.utils.data.DataObject;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleStatus;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
+import org.camelia.studio.kiss.shot.acerola.services.moderation.ApiDefaults;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
@@ -79,7 +80,8 @@ class ModuleConfigurationModalTest {
                     null,
                     null,
                     Map.of(),
-                    Map.of());
+                    Map.of(),
+                    ApiDefaults.settings(module));
 
             Modal modal = ModuleConfigurationModal.create(
                     guild,
@@ -177,7 +179,8 @@ class ModuleConfigurationModalTest {
                 null,
                 null,
                 Map.of(),
-                Map.of());
+                Map.of(),
+                ApiDefaults.settings(module));
     }
 
     private static Guild emptyGuild() {

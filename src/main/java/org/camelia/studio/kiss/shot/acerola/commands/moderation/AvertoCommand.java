@@ -7,13 +7,10 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
-import org.camelia.studio.kiss.shot.acerola.models.Averto;
 import org.camelia.studio.kiss.shot.acerola.models.DiscordServer;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
-import org.camelia.studio.kiss.shot.acerola.models.User;
-import org.camelia.studio.kiss.shot.acerola.repositories.AvertoRepository;
+import org.camelia.studio.kiss.shot.acerola.services.AvertoService;
 import org.camelia.studio.kiss.shot.acerola.services.DiscordServerService;
-import org.camelia.studio.kiss.shot.acerola.services.UserService;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
@@ -83,8 +80,7 @@ public class AvertoCommand implements ISlashCommand {
             String proofNotice = "";
             String guildId = event.getGuild().getId();
             DiscordServer server = DiscordServerService.getInstance().register(guildId);
-            GuildMessageChannel logChannel = DiscordServerService.getInstance()
-                    .getLogChannelId(guildId)
+            GuildMessageChannel logChannel = Optional.ofNullable(server.logChannelId())
                     .map(channelId -> event.getGuild().getChannelById(GuildMessageChannel.class, channelId))
                     .orElse(null);
 
@@ -117,14 +113,7 @@ public class AvertoCommand implements ISlashCommand {
                 proofNotice = " Aucun salon de logs n'est configuré ; la preuve n'a pas été conservée.";
             }
 
-            User memberUser = UserService.getInstance().getOrCreateUser(member.getId());
-            User moderatorUser = UserService.getInstance().getOrCreateUser(moderator.getId());
-
-            Averto averto = new Averto(memberUser, moderatorUser, server);
-            averto.setReason(reason);
-            averto.setFile(fileUrl);
-
-            AvertoRepository.getInstance().save(averto);
+            AvertoService.getInstance().save(guildId, member.getId(), moderator.getId(), reason, fileUrl);
 
             // On tente d'envoyer un message privé à l'utilisateur averti
             member.getUser().openPrivateChannel().queue(privateChannel -> {

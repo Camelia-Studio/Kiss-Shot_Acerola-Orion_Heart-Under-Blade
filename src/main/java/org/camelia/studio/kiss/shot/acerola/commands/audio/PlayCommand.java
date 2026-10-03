@@ -17,6 +17,7 @@ import org.camelia.studio.kiss.shot.acerola.audio.PlayerManager;
 import org.camelia.studio.kiss.shot.acerola.interfaces.ISlashCommand;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.recording.RecordingService;
+import org.camelia.studio.kiss.shot.acerola.utils.UrlSafetyValidator;
 
 public class PlayCommand implements ISlashCommand {
     @Override
@@ -44,6 +45,12 @@ public class PlayCommand implements ISlashCommand {
     public void execute(SlashCommandInteractionEvent event) {
         event.deferReply().queue();
         String url = event.getOption("url").getAsString();
+
+        if (!UrlSafetyValidator.isSafePublicUrl(url)) {
+            event.getHook().editOriginal("Cette URL n'est pas autorisée.").queue();
+            return;
+        }
+
         Member member = event.getMember();
         GuildVoiceState voiceState = member.getVoiceState();
 
