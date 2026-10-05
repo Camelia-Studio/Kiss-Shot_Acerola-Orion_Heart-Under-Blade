@@ -168,6 +168,10 @@ public final class ConfigDashboard {
                 buttons.add(Button.primary(actionId(ActionType.CONFIGURE_SANCTION, module), "Action"));
                 buttons.add(Button.secondary(actionId(ActionType.CONFIGURE_RESOURCES, module), "Ressources"));
             }
+            case MEMBER_AUDIT -> {
+                buttons.add(Button.primary(actionId(ActionType.CONFIGURE, module), "Éléments surveillés"));
+                buttons.add(Button.secondary(actionId(ActionType.CONFIGURE_RESOURCES, module), "Salon de logs"));
+            }
             default -> {
                 if (ModuleConfigurationModal.hasEditableSettings(module)) {
                     buttons.add(Button.primary(actionId(ActionType.CONFIGURE, module), "Configurer"));
@@ -196,7 +200,10 @@ public final class ConfigDashboard {
 
     private static void addSettings(EmbedBuilder embed, ModuleConfiguration configuration) {
         boolean hasSettings = false;
-        if (configuration.logChannelId() != null && !configuration.logChannelId().isBlank()) {
+        // L'audit des membres a son propre salon (affiché avec les salons du module) : le salon de logs
+        // du serveur ne le concerne pas.
+        if (configuration.module() != ModuleType.MEMBER_AUDIT
+                && configuration.logChannelId() != null && !configuration.logChannelId().isBlank()) {
             embed.addField("Salon de logs", "<#" + configuration.logChannelId() + ">", false);
             hasSettings = true;
         }
@@ -237,6 +244,11 @@ public final class ConfigDashboard {
                             settings.mentionLimit() + " mention(s) en " + settings.mentionWindow().toSeconds() + " s")
                             + " · suppression : " + yesNo(settings.deleteMentionMessage()),
                     false);
+            hasSettings = true;
+        } else if (configuration.module() == ModuleType.MEMBER_AUDIT) {
+            ModerationSettings.MemberAudit settings = ModerationSettings.memberAudit(configuration);
+            embed.addField("Pseudos surveillés", yesNo(settings.watchNickname()), true);
+            embed.addField("Avatars surveillés", yesNo(settings.watchAvatar()), true);
             hasSettings = true;
         } else if (configuration.module() == ModuleType.AUTO_SANCTION_CHANNEL
                 || configuration.module() == ModuleType.AUTO_SANCTION_ROLE) {
@@ -292,6 +304,7 @@ public final class ConfigDashboard {
             case WATCHED -> "Rôles surveillés";
             case PROTECTED -> "Rôles protégés";
             case EXCLUDED -> "Rôles exclus";
+            case LOG -> "Rôles de logs";
         };
     }
 
@@ -301,6 +314,7 @@ public final class ConfigDashboard {
             case WATCHED -> "Salons surveillés";
             case PROTECTED -> "Salons protégés";
             case EXCLUDED -> "Salons exclus";
+            case LOG -> "Salon de logs";
         };
     }
 

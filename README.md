@@ -14,6 +14,7 @@
 
 - avertissements horodatés et historique par membre ;
 - détection anti-raid ;
+- audit des membres : journalisation des changements de pseudo et d'avatar pour repérer les usurpations d'identité ;
 - bannissement automatique selon un rôle ou un salon surveillé ;
 - attribution d'un rôle à l'arrivée d'un nouveau membre.
 

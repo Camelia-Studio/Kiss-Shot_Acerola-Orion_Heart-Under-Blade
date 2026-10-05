@@ -26,6 +26,7 @@ public final class ApiDefaults {
                 values.putAll(ModerationSettings.automaticSanctionValues(SanctionAction.LOG_ONLY, 600, 0, false));
                 values.remove(ModuleSetting.SANCTION_ACTION);
             }
+            case MEMBER_AUDIT -> values.putAll(ModerationSettings.memberAuditValues(true, true));
             default -> {
             }
         }

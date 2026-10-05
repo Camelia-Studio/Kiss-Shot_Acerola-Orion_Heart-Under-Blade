@@ -38,7 +38,30 @@ class ModuleConfigurationModalTest {
                 ModuleType.INTEGRATION_REMOVAL,
                 ModuleType.ANTI_RAID,
                 ModuleType.AUTO_SANCTION_CHANNEL,
-                ModuleType.AUTO_SANCTION_ROLE), modules);
+                ModuleType.AUTO_SANCTION_ROLE,
+                ModuleType.MEMBER_AUDIT), modules);
+    }
+
+    @Test
+    void memberAuditModalsExposeTheWatchedItemsAndOnlyTheLogChannel() {
+        Guild guild = emptyGuild();
+        ModuleConfiguration memberAudit = configuration(ModuleType.MEMBER_AUDIT);
+
+        Modal watched = ModuleConfigurationModal.create(
+                guild,
+                memberAudit,
+                ModuleConfigurationModal.SubmissionAction.CONFIGURE,
+                ModuleConfigurationModal.Section.DEFAULT);
+        Modal resources = ModuleConfigurationModal.create(
+                guild,
+                memberAudit,
+                ModuleConfigurationModal.SubmissionAction.ACTIVATE);
+
+        assertEquals(2, watched.getComponents().size());
+        assertEquals(1, resources.getComponents().size());
+        assertTrue(ModuleConfigurationModal.submissionFrom("config:configure:MEMBER_AUDIT:DEFAULT").isPresent());
+        assertTrue(ModuleConfigurationModal.submissionFrom("config:configure:MEMBER_AUDIT:RESOURCES").isPresent());
+        assertTrue(ModuleConfigurationModal.submissionFrom("config:configure:MEMBER_AUDIT:SANCTION").isEmpty());
     }
 
     @Test

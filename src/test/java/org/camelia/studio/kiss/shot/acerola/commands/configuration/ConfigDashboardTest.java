@@ -40,6 +40,21 @@ class ConfigDashboardTest {
     }
 
     @Test
+    void memberAuditOffersItsWatchedItemsAndLogChannel() {
+        ConfigDashboard.View view = ConfigDashboard.create(
+                configurations(ModuleType.MEMBER_AUDIT, ModuleStatus.DISABLED),
+                ModuleType.MEMBER_AUDIT,
+                null);
+
+        assertEquals(
+                List.of("Éléments surveillés", "Salon de logs", "Activer"),
+                view.components().get(1).getButtons().stream().map(Button::getLabel).toList());
+        List<String> fields = view.embed().getFields().stream().map(field -> field.getName()).toList();
+        assertTrue(fields.contains("Pseudos surveillés"));
+        assertTrue(fields.contains("Avatars surveillés"));
+    }
+
+    @Test
     void suspendedModuleOffersCorrectionRevalidationAndDisableActions() {
         ConfigDashboard.View view = ConfigDashboard.create(
                 configurations(ModuleType.AUTO_SANCTION_CHANNEL, ModuleStatus.SUSPENDED),

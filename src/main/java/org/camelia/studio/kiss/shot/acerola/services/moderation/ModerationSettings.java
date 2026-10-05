@@ -40,6 +40,20 @@ public final class ModerationSettings {
                 bool(values, ModuleSetting.SANCTION_DELETE_MESSAGE));
     }
 
+    public static MemberAudit memberAudit(ModuleConfiguration configuration) {
+        Map<ModuleSetting, String> values = configuration.settings();
+        return new MemberAudit(
+                bool(values, ModuleSetting.MEMBER_AUDIT_WATCH_NICKNAME),
+                bool(values, ModuleSetting.MEMBER_AUDIT_WATCH_AVATAR));
+    }
+
+    public static Map<ModuleSetting, String> memberAuditValues(boolean watchNickname, boolean watchAvatar) {
+        Map<ModuleSetting, String> values = new EnumMap<>(ModuleSetting.class);
+        values.put(ModuleSetting.MEMBER_AUDIT_WATCH_NICKNAME, String.valueOf(watchNickname));
+        values.put(ModuleSetting.MEMBER_AUDIT_WATCH_AVATAR, String.valueOf(watchAvatar));
+        return Map.copyOf(values);
+    }
+
     public static Map<ModuleSetting, String> recentAccountValues(
             boolean enabled,
             int maximumAgeDays,
@@ -158,6 +172,9 @@ public final class ModerationSettings {
             Duration mentionTimeout,
             boolean deleteMentionMessage
     ) {
+    }
+
+    public record MemberAudit(boolean watchNickname, boolean watchAvatar) {
     }
 
     public record AutomaticSanction(
