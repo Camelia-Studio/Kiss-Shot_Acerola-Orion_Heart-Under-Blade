@@ -60,6 +60,26 @@ class ModerationSettingsTest {
         assertTrue(settings.deleteMessage());
     }
 
+    @Test
+    void memberAuditWatchesBothElementsByDefault() {
+        ModerationSettings.MemberAudit settings = ModerationSettings.memberAudit(
+                configuration(ModuleType.MEMBER_AUDIT));
+
+        assertTrue(settings.watchNickname());
+        assertTrue(settings.watchAvatar());
+    }
+
+    @Test
+    void savedMemberAuditValuesRoundTrip() {
+        ModuleConfiguration configured = configuration(ModuleType.MEMBER_AUDIT).withSettings(
+                ModerationSettings.memberAuditValues(false, true));
+
+        ModerationSettings.MemberAudit settings = ModerationSettings.memberAudit(configured);
+
+        assertFalse(settings.watchNickname());
+        assertTrue(settings.watchAvatar());
+    }
+
     private ModuleConfiguration configuration(ModuleType module) {
         return new ModuleConfiguration(
                 module,

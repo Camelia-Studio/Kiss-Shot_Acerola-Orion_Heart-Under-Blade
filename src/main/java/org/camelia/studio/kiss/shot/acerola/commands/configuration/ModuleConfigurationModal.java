@@ -46,6 +46,8 @@ public final class ModuleConfigurationModal {
     private static final String DELETE_MESSAGE = "delete_message";
     private static final String SANCTION_ACTION = "sanction_action";
     private static final String BAN_HISTORY_DAYS = "ban_history_days";
+    private static final String WATCH_NICKNAME = "watch_nickname";
+    private static final String WATCH_AVATAR = "watch_avatar";
     private static final int MAX_SELECTIONS = 25;
 
     private ModuleConfigurationModal() {
@@ -57,7 +59,8 @@ public final class ModuleConfigurationModal {
                  INTEGRATION_REMOVAL,
                  ANTI_RAID,
                  AUTO_SANCTION_CHANNEL,
-                 AUTO_SANCTION_ROLE -> true;
+                 AUTO_SANCTION_ROLE,
+                 MEMBER_AUDIT -> true;
             default -> false;
         };
     }
@@ -114,11 +117,18 @@ public final class ModuleConfigurationModal {
                     configuration.channels(ModuleResourcePurpose.EXCLUDED),
                     false,
                     MAX_SELECTIONS));
+                else if (module == ModuleType.MEMBER_AUDIT) addMemberAuditSettings(modal, configuration);
                 else throw new IllegalArgumentException("Section de configuration incompatible avec ce module");
             }
-            case RESOURCES -> modal.addComponents(
-                    logChannelSelector(guild, configuration.logChannelId()),
-                    protectedRolesSelector(guild, configuration));
+            case RESOURCES -> {
+                if (module == ModuleType.MEMBER_AUDIT) {
+                    modal.addComponents(memberAuditLogChannelSelector(guild, configuration));
+                } else {
+                    modal.addComponents(
+                            logChannelSelector(guild, configuration.logChannelId()),
+                            protectedRolesSelector(guild, configuration));
+                }
+            }
             case TRIGGERS -> {
                 if (module == ModuleType.AUTO_SANCTION_CHANNEL) modal.addComponents(channelSelector(
                             guild,
@@ -195,11 +205,16 @@ public final class ModuleConfigurationModal {
                 else if (module == ModuleType.LINK_ENRICHMENT) channels.put(
                     ModuleResourcePurpose.EXCLUDED,
                     selectedChannelIds(event, EXCLUDED_CHANNELS));
+                else if (module == ModuleType.MEMBER_AUDIT) settings = memberAuditSettings(event);
                 else throw new IllegalArgumentException("Section de configuration incompatible avec ce module");
             }
             case RESOURCES -> {
-                logChannelId = selectedChannelId(event, LOG_CHANNEL);
-                roles.put(ModuleResourcePurpose.PROTECTED, selectedRoleIds(event, PROTECTED_ROLES));
+                if (module == ModuleType.MEMBER_AUDIT) {
+                    channels.put(ModuleResourcePurpose.LOG, selectedChannelIds(event, LOG_CHANNEL));
+                } else {
+                    logChannelId = selectedChannelId(event, LOG_CHANNEL);
+                    roles.put(ModuleResourcePurpose.PROTECTED, selectedRoleIds(event, PROTECTED_ROLES));
+                }
             }
             case TRIGGERS -> {
                 if (module == ModuleType.AUTO_SANCTION_CHANNEL) channels.put(
@@ -216,6 +231,30 @@ public final class ModuleConfigurationModal {
         }
 
         return new ModuleConfigurationSettings(logChannelId, roles, channels, settings);
+    }
+
+    private static void addMemberAuditSettings(Modal.Builder modal, ModuleConfiguration configuration) {
+        ModerationSettings.MemberAudit settings = ModerationSettings.memberAudit(configuration);
+        modal.addComponents(
+                booleanSelector(
+                        WATCH_NICKNAME,
+                        "Surveiller les pseudos",
+                        "Pseudo du serveur, pseudo global et nom d'utilisateur.",
+                        settings.watchNickname()),
+                booleanSelector(
+                        WATCH_AVATAR,
+                        "Surveiller les avatars",
+                        "Avatar du serveur et avatar global.",
+                        settings.watchAvatar()));
+    }
+
+    private static Map<ModuleSetting, String> memberAuditSettings(ModalInteractionEvent event) {
+        boolean watchNickname = Boolean.parseBoolean(selectedString(event, WATCH_NICKNAME));
+        boolean watchAvatar = Boolean.parseBoolean(selectedString(event, WATCH_AVATAR));
+        if (!watchNickname && !watchAvatar) {
+            throw new IllegalArgumentException("Au moins un élément (pseudo ou avatar) doit être surveillé.");
+        }
+        return ModerationSettings.memberAuditValues(watchNickname, watchAvatar);
     }
 
     private static void addRecentAccountSettings(Modal.Builder modal, ModuleConfiguration configuration) {
@@ -461,7 +500,7 @@ public final class ModuleConfigurationModal {
 
     private static Section defaultSection(ModuleType module) {
         return switch (module) {
-            case ANTI_RAID, AUTO_SANCTION_CHANNEL, AUTO_SANCTION_ROLE -> Section.RESOURCES;
+            case ANTI_RAID, AUTO_SANCTION_CHANNEL, AUTO_SANCTION_ROLE, MEMBER_AUDIT -> Section.RESOURCES;
             default -> Section.DEFAULT;
         };
     }
@@ -470,10 +509,12 @@ public final class ModuleConfigurationModal {
         return switch (section) {
             case DEFAULT -> module == ModuleType.AUTO_ROLE
                     || module == ModuleType.INTEGRATION_REMOVAL
-                    || module == ModuleType.LINK_ENRICHMENT;
+                    || module == ModuleType.LINK_ENRICHMENT
+                    || module == ModuleType.MEMBER_AUDIT;
             case RESOURCES -> module == ModuleType.ANTI_RAID
                     || module == ModuleType.AUTO_SANCTION_CHANNEL
-                    || module == ModuleType.AUTO_SANCTION_ROLE;
+                    || module == ModuleType.AUTO_SANCTION_ROLE
+                    || module == ModuleType.MEMBER_AUDIT;
             case TRIGGERS -> module == ModuleType.AUTO_SANCTION_CHANNEL
                     || module == ModuleType.AUTO_SANCTION_ROLE;
             case RECENT_ACCOUNT, MENTION_SPAM -> module == ModuleType.ANTI_RAID;
@@ -485,7 +526,7 @@ public final class ModuleConfigurationModal {
     private static String modalTitle(ModuleType module, Section section) {
         return switch (section) {
             case DEFAULT -> "Configurer " + label(module);
-            case RESOURCES -> "Ressources de modération";
+            case RESOURCES -> module == ModuleType.MEMBER_AUDIT ? "Salon de logs" : "Ressources de modération";
             case TRIGGERS -> "Configurer les déclencheurs";
             case RECENT_ACCOUNT -> "Règle des comptes récents";
             case MENTION_SPAM -> "Règle du spam de mentions";
@@ -505,6 +546,7 @@ public final class ModuleConfigurationModal {
             case ANTI_RAID -> "Anti-raid";
             case AUTO_SANCTION_CHANNEL -> "Sanction automatique par salon";
             case AUTO_SANCTION_ROLE -> "Sanction automatique par rôle";
+            case MEMBER_AUDIT -> "Audit des membres";
         };
     }
 
@@ -516,6 +558,20 @@ public final class ModuleConfigurationModal {
                 "Salon de logs",
                 "Les actions et erreurs de ce module y seront publiées.",
                 current,
+                true,
+                1);
+    }
+
+    /**
+     * Salon propre au module, indépendant du salon de logs du serveur.
+     */
+    private static Label memberAuditLogChannelSelector(Guild guild, ModuleConfiguration configuration) {
+        return channelSelector(
+                guild,
+                LOG_CHANNEL,
+                "Salon de logs de l'audit",
+                "Les changements de pseudo et d'avatar y seront publiés.",
+                configuration.channels(ModuleResourcePurpose.LOG),
                 true,
                 1);
     }

@@ -48,6 +48,7 @@ public class ModuleConfigurationValidator {
                 case ANTI_RAID -> validateAntiRaid(guild, self, configuration);
                 case AUTO_SANCTION_CHANNEL -> validateAutomaticSanction(guild, self, configuration, true, false);
                 case AUTO_SANCTION_ROLE -> validateAutomaticSanction(guild, self, configuration, false, true);
+                case MEMBER_AUDIT -> validateMemberAudit(guild, configuration);
             };
         } catch (IllegalArgumentException exception) {
             return ModuleValidationResult.invalid(exception.getMessage());
@@ -144,6 +145,21 @@ public class ModuleConfigurationValidator {
             }
         }
         return validateProtectedRoles(guild, configuration);
+    }
+
+    private ModuleValidationResult validateMemberAudit(Guild guild, ModuleConfiguration configuration) {
+        Set<String> logChannelIds = configuration.channels(ModuleResourcePurpose.LOG);
+        if (logChannelIds.size() != 1) {
+            return ModuleValidationResult.invalid("Un salon de logs doit être configuré pour ce module");
+        }
+        ModuleValidationResult logChannel = validateLogChannel(guild, logChannelIds.iterator().next());
+        if (!logChannel.valid()) return logChannel;
+
+        ModerationSettings.MemberAudit settings = ModerationSettings.memberAudit(configuration);
+        if (!settings.watchNickname() && !settings.watchAvatar()) {
+            return ModuleValidationResult.invalid("Au moins un élément (pseudo ou avatar) doit être surveillé");
+        }
+        return ModuleValidationResult.success();
     }
 
     private ModuleValidationResult validateAutomaticSanction(

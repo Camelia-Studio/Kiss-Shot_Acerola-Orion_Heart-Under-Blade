@@ -4,5 +4,6 @@ public enum ModuleResourcePurpose {
     TARGET,
     WATCHED,
     PROTECTED,
-    EXCLUDED
+    EXCLUDED,
+    LOG
 }
