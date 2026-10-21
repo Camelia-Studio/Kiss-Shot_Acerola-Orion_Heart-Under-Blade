@@ -77,6 +77,7 @@ Les principales variables sont :
 | `BOT_TOKEN` | Jeton de l'application Discord |
 | `API_BASE_URL` | URL de l'API Kiss-Shot, préfixe `/api` compris |
 | `API_BOT_TOKEN` | Token statique du bot, envoyé en `Authorization: Bearer` (même valeur que côté API) |
+| `HEALTHCHECK_URL` | URL d'une sonde de monitoring en mode push (optionnelle), voir [Healthcheck](#healthcheck) |
 | `SAUCY_*` | Configuration des aperçus Twitter/X, Pixiv et Misskey |
 | `RECORDING_*` | Configuration des enregistrements vocaux |
 
@@ -87,6 +88,10 @@ Les salons, rôles, états de modules et autres réglages propres à un serveur 
 Le bot ne se connecte plus à une base de données : toute la persistance passe par l'API Kiss-Shot, qui gère le schéma et ses migrations. Le bot vérifie au démarrage que `API_BASE_URL` et `API_BOT_TOKEN` sont renseignés.
 
 L'API ne connaît pas l'état de Discord : la validation qui en dépend (existence des salons et rôles, permissions du bot) reste dans le bot, qui n'envoie `ACTIVE` qu'une fois celle-ci réussie et suspend lui-même un module dont la validation échoue. La configuration lue est gardée 30 secondes en mémoire, ce qui laisse une modification faite depuis le backoffice devenir visible rapidement.
+
+### Healthcheck
+
+Si `HEALTHCHECK_URL` est renseignée, le bot y envoie une requête `GET` toutes les 45 secondes. Avant chaque envoi, il vérifie qu'il est connecté à Discord et que l'API Kiss-Shot répond (lecture authentifiée d'un serveur inexistant, dont le `404` prouve que l'API et sa base fonctionnent). Si l'une de ces conditions échoue, rien n'est envoyé : le bot ne peut pas fonctionner sans l'API, et c'est l'absence de signal que la sonde détecte. Vide par défaut (healthcheck désactivé).
 
 ### Compilation et lancement
 
