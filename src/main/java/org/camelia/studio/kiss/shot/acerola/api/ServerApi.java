@@ -16,6 +16,9 @@ import java.util.Set;
  * Cycle de vie des serveurs et salon de logs (routes {@code /servers}).
  */
 public class ServerApi {
+    // Identifiant au format Discord (15 à 20 chiffres) qu'aucun serveur ne porte.
+    private static final String PROBE_DISCORD_ID = "000000000000000";
+
     private final ApiClient client;
 
     public ServerApi(ApiClient client) {
@@ -59,6 +62,20 @@ public class ServerApi {
         body.put("actorId", actorId);
         body.put("channelId", channelId);
         return toServer(client.put("/servers/" + discordId + "/log-channel", body));
+    }
+
+    /**
+     * L'API n'expose pas de route de santé : la lecture d'un serveur qui n'existe pas traverse l'authentification
+     * et la base sans rien modifier. Un {@code 404} prouve donc que l'API répond ; toute autre erreur (réseau,
+     * 5xx, jeton refusé) la rend inutilisable pour le bot.
+     */
+    public boolean isAvailable() {
+        try {
+            client.getIfExists("/servers/" + PROBE_DISCORD_ID);
+            return true;
+        } catch (ApiException exception) {
+            return false;
+        }
     }
 
     private static DiscordServer toServer(JsonNode node) {

@@ -13,8 +13,10 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ServerAndAvertoApiTest {
     private static final String SERVER = "123456789012345678";
@@ -129,5 +131,34 @@ class ServerAndAvertoApiTest {
                             {"userId":"666","moderatorId":"444","reason":"Spam","file":"https://cdn/x.png"}"""),
                     mapper.readTree(server.requests().getFirst().body()));
         }
+    }
+
+    @Test
+    void apiIsAvailableWhenTheProbeIsNotFound() throws IOException {
+        try (FakeApiServer server = new FakeApiServer()) {
+            assertTrue(new ServerApi(server.client()).isAvailable());
+            assertEquals("Bearer " + FakeApiServer.TOKEN, server.requests().getFirst().authorization());
+        }
+    }
+
+    @Test
+    void apiIsUnavailableOnServerErrorOrRejectedToken() throws IOException {
+        try (FakeApiServer server = new FakeApiServer()) {
+            server.respond("GET", "/servers/000000000000000", 503, "{}");
+            assertFalse(new ServerApi(server.client()).isAvailable());
+
+            server.respond("GET", "/servers/000000000000000", 401, "{}");
+            assertFalse(new ServerApi(server.client()).isAvailable());
+        }
+    }
+
+    @Test
+    void apiIsUnavailableWhenUnreachable() throws IOException {
+        ApiClient client;
+        try (FakeApiServer server = new FakeApiServer()) {
+            client = server.client();
+        }
+
+        assertFalse(new ServerApi(client).isAvailable());
     }
 }
