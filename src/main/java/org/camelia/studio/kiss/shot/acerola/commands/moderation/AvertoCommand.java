@@ -11,6 +11,7 @@ import org.camelia.studio.kiss.shot.acerola.models.DiscordServer;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleType;
 import org.camelia.studio.kiss.shot.acerola.services.AvertoService;
 import org.camelia.studio.kiss.shot.acerola.services.DiscordServerService;
+import org.camelia.studio.kiss.shot.acerola.services.configuration.LogChannelResolver;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
@@ -81,7 +82,7 @@ public class AvertoCommand implements ISlashCommand {
             String guildId = event.getGuild().getId();
             DiscordServer server = DiscordServerService.getInstance().register(guildId);
             GuildMessageChannel logChannel = Optional.ofNullable(server.logChannelId())
-                    .map(channelId -> event.getGuild().getChannelById(GuildMessageChannel.class, channelId))
+                    .flatMap(channelId -> LogChannelResolver.getInstance().resolveNow(event.getGuild(), channelId))
                     .orElse(null);
 
             if (fileOptionMapping != null) {

@@ -12,9 +12,21 @@ import org.camelia.studio.kiss.shot.acerola.models.SanctionAction;
 import org.camelia.studio.kiss.shot.acerola.services.moderation.ModerationSettings;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 
 public class ModuleConfigurationValidator {
+    private final BiFunction<Guild, String, Optional<GuildMessageChannel>> logChannels;
+
+    public ModuleConfigurationValidator() {
+        this(LogChannelResolver.getInstance()::resolveNow);
+    }
+
+    ModuleConfigurationValidator(BiFunction<Guild, String, Optional<GuildMessageChannel>> logChannels) {
+        this.logChannels = logChannels;
+    }
+
     public ModuleValidationResult validate(Guild guild, ModuleConfiguration configuration) {
         Member self = guild.getSelfMember();
         try {
@@ -60,12 +72,13 @@ public class ModuleConfigurationValidator {
             return ModuleValidationResult.success();
         }
 
-        GuildMessageChannel channel = guild.getChannelById(GuildMessageChannel.class, channelId);
+        GuildMessageChannel channel = logChannels.apply(guild, channelId).orElse(null);
         if (channel == null) {
             return ModuleValidationResult.invalid("Le salon de logs n'existe plus");
         }
-        if (!isWritableMessageChannel(channel)) {
-            return ModuleValidationResult.invalid("Le fil de logs est archivé ou verrouillé");
+        // Un fil archivé reste valable : Discord le rouvre quand le bot y publie.
+        if (channel instanceof ThreadChannel thread && thread.isLocked()) {
+            return ModuleValidationResult.invalid("Le fil de logs est verrouillé");
         }
         if (!hasMessageChannelPermissions(
                 guild.getSelfMember(),

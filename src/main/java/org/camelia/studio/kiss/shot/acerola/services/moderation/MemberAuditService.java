@@ -5,10 +5,10 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.User;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.utils.MarkdownSanitizer;
 import net.dv8tion.jda.api.utils.TimeFormat;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
+import org.camelia.studio.kiss.shot.acerola.services.configuration.LogChannelResolver;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,16 +109,16 @@ public class MemberAuditService {
 
     private void send(Guild guild, ModuleConfiguration configuration, MessageEmbed embed) {
         String logChannelId = configuration.channels(ModuleResourcePurpose.LOG).stream().findFirst().orElse(null);
-        GuildMessageChannel logChannel = logChannelId == null
-                ? null
-                : guild.getChannelById(GuildMessageChannel.class, logChannelId);
-        if (logChannel == null) {
-            logger.error("Salon de logs indisponible pour l'audit des membres sur {}", guild.getId());
-            return;
-        }
-        logChannel.sendMessageEmbeds(embed).queue(
-                null,
-                error -> logger.error("Impossible d'écrire l'audit des membres dans le salon de logs", error));
+        LogChannelResolver.getInstance().resolve(guild, logChannelId)
+                .thenAccept(logChannel -> logChannel.ifPresentOrElse(
+                        channel -> channel.sendMessageEmbeds(embed).queue(
+                                null,
+                                error -> logger.error("Impossible d'écrire l'audit des membres dans le salon de logs", error)),
+                        () -> logger.error("Salon de logs indisponible pour l'audit des membres sur {}", guild.getId())))
+                .exceptionally(error -> {
+                    logger.error("Impossible d'écrire l'audit des membres dans le salon de logs", error);
+                    return null;
+                });
     }
 
     private static String textLabel(String value) {

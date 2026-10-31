@@ -3,10 +3,10 @@ package org.camelia.studio.kiss.shot.acerola.services.moderation;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import org.camelia.studio.kiss.shot.acerola.models.ModuleResourcePurpose;
 import org.camelia.studio.kiss.shot.acerola.models.SanctionAction;
+import org.camelia.studio.kiss.shot.acerola.services.configuration.LogChannelResolver;
 import org.camelia.studio.kiss.shot.acerola.services.configuration.ModuleConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,14 +102,6 @@ public class AutomaticSanctionExecutor {
             String details,
             String errorReason
     ) {
-        GuildMessageChannel logChannel = member.getGuild().getChannelById(
-                GuildMessageChannel.class,
-                configuration.logChannelId());
-        if (logChannel == null) {
-            logger.error("Salon de logs indisponible pour la sanction automatique sur {}", member.getGuild().getId());
-            return;
-        }
-
         boolean success = errorReason == null;
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(success ? "Modération automatique — Succès" : "Modération automatique — Échec")
@@ -121,9 +113,18 @@ public class AutomaticSanctionExecutor {
         if (!success) {
             embed.addField("Raison de l'échec", errorReason, false);
         }
-        logChannel.sendMessageEmbeds(embed.build()).queue(
-                null,
-                error -> logger.error("Impossible d'écrire dans le salon de logs", error));
+        LogChannelResolver.getInstance().resolve(member.getGuild(), configuration.logChannelId())
+                .thenAccept(logChannel -> logChannel.ifPresentOrElse(
+                        channel -> channel.sendMessageEmbeds(embed.build()).queue(
+                                null,
+                                error -> logger.error("Impossible d'écrire dans le salon de logs", error)),
+                        () -> logger.error(
+                                "Salon de logs indisponible pour la sanction automatique sur {}",
+                                member.getGuild().getId())))
+                .exceptionally(error -> {
+                    logger.error("Impossible d'écrire dans le salon de logs", error);
+                    return null;
+                });
     }
 
     private String actionLabel(SanctionAction action) {

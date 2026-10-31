@@ -16,10 +16,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ModuleConfigurationService {
@@ -258,6 +260,20 @@ public class ModuleConfigurationService {
         return ConfigurationOperationResult.success(channelId == null
                 ? "Le salon de logs a été supprimé. Les modules qui en dépendent ont été suspendus."
                 : "Le salon de logs a été mis à jour.");
+    }
+
+    /**
+     * Salons de logs configurés sur le serveur (celui du serveur et ceux des modules), sans revalider les modules.
+     */
+    public Set<String> logChannelIds(Guild guild) {
+        Set<String> ids = new HashSet<>();
+        for (ModuleConfiguration configuration : moduleApi.findAll(guild.getId())) {
+            if (configuration.logChannelId() != null && !configuration.logChannelId().isBlank()) {
+                ids.add(configuration.logChannelId());
+            }
+            ids.addAll(configuration.channels(ModuleResourcePurpose.LOG));
+        }
+        return ids;
     }
 
     public synchronized void evictGuild(String guildId) {
